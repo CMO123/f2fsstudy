@@ -39,7 +39,7 @@
 
 static struct kmem_cache *f2fs_inode_cachep;
 
-#ifdef CONFIG_F2FS_FAULT_INJECTION
+#ifdef CONFIG_cF2FS_FAULT_INJECTION
 
 char *fault_name[FAULT_MAX] = {
 	[FAULT_KMALLOC]		= "kmalloc",
@@ -2447,6 +2447,7 @@ static int f2fs_scan_devices(struct f2fs_sb_info *sbi)
 	return 0;
 }
 
+//初始化struct super_block超级块的基本信息
 static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct f2fs_sb_info *sbi;
@@ -2491,6 +2492,8 @@ try_onemore:
 	if (err)
 		goto free_sbi;
 
+	//	s_fs_info与文件系统类型相关，不同文件系统该信息不同，但都保存到超级块的sb->s_fs_info中.
+	// 这部分信息很重要，文件系统中经常用到。
 	sb->s_fs_info = sbi;
 	sbi->raw_super = raw_super;
 
@@ -2548,7 +2551,7 @@ try_onemore:
 		}
 	}
 #endif
-
+	//初始化super_block的s_op项,sb->s_op= &jffs2_super_operations;
 	sb->s_op = &f2fs_sops;
 #ifdef CONFIG_F2FS_FS_ENCRYPTION
 	sb->s_cop = &f2fs_cryptops;
@@ -2616,6 +2619,7 @@ try_onemore:
 	}
 
 	/* get an inode for meta space */
+	
 	sbi->meta_inode = f2fs_iget(sb, F2FS_META_INO(sbi));
 	if (IS_ERR(sbi->meta_inode)) {
 		f2fs_msg(sb, KERN_ERR, "Failed to read F2FS meta data inode");
@@ -2697,6 +2701,11 @@ try_onemore:
 		goto free_node_inode;
 
 	/* read root inode and dentry */
+	/*
+	该函数能够查询特定超级块下指定inode number的inode。如果inode number不存在，则创建新的inode，并将inode number赋值给新的inode.
+	一般来说系统都用类似的jffs2_iget->iget_locked/ubifs_iget->iget_locked来创建新inode，或查询已存在的inode。
+	每个超级块都存在一个root inode,其中结点号是inode->i_ino=1，返回值是超级块的根节点inode。
+	*/
 	root = f2fs_iget(sb, F2FS_ROOT_INO(sbi));
 	if (IS_ERR(root)) {
 		f2fs_msg(sb, KERN_ERR, "Failed to read root inode");
@@ -2708,7 +2717,7 @@ try_onemore:
 		err = -EINVAL;
 		goto free_node_inode;
 	}
-
+	//每个超级块都存在一个root inode对应的目录项dentry,其中结点号是dentry->d_iname="/"
 	sb->s_root = d_make_root(root); /* allocate root dentry */
 	if (!sb->s_root) {
 		err = -ENOMEM;
@@ -2873,7 +2882,7 @@ free_sbi:
 static struct dentry *f2fs_mount(struct file_system_type *fs_type, int flags,
 			const char *dev_name, void *data)
 {
-	return mount_bdev(fs_type, flags, dev_name, data, f2fs_fill_super);
+	return mount_bdev(fs_type, flags, dev_name, data, f2fs_fill_super);//mount_bdev是用于块设备挂载的函数。调用f2fs_fill_super
 }
 
 static void kill_f2fs_super(struct super_block *sb)
@@ -2899,7 +2908,7 @@ static int __init init_inodecache(void)
 {
 	f2fs_inode_cachep = kmem_cache_create("f2fs_inode_cache",
 			sizeof(struct f2fs_inode_info), 0,
-			SLAB_RECLAIM_ACCOUNT|SLAB_ACCOUNT, NULL);
+			SLAB_RECLAIM_ACCOUNT|SLAB_ACCOUNT, NULL);///*SLAB_RECLAIM_ACCOUNT表示此slab所占页面为可回收的，当内核检测是否有足够的页面满足用户态的需求时，此类页面将被计算在内，通过调用kmem_freepages()函数可以释放分配给slab的页框。由于是可回收的，所以不需要做后面的碎片检测了*/
 	if (!f2fs_inode_cachep)
 		return -ENOMEM;
 	return 0;
@@ -2921,30 +2930,39 @@ static int __init init_f2fs_fs(void)
 
 	f2fs_build_trace_ios();
 
+	//1.创建inode cache
 	err = init_inodecache();
 	if (err)
 		goto fail;
+	//2. 创建nat_entry,free_nid,nat_entry_set
 	err = create_node_manager_caches();
 	if (err)
 		goto free_inodecache;
+	//3. 创建discard_entry,discard_cmd,sit_entry_set,inmem_pages
 	err = create_segment_manager_caches();
 	if (err)
 		goto free_node_manager_caches;
+	//4. 创建ino_entry,inode_entry
 	err = create_checkpoint_caches();
 	if (err)
 		goto free_segment_manager_caches;
+	//5. 创建extent_tree，extent_node
 	err = create_extent_cache();
 	if (err)
 		goto free_checkpoint_caches;
+	//6. 初始化sysfs
 	err = f2fs_init_sysfs();
 	if (err)
 		goto free_extent_cache;
-	err = register_shrinker(&f2fs_shrinker_info);
+	//7. 注册回收
+	err = register_shrinker(&f2fs_shrinker_info);//内存回收：页面的使用者可以向PFRA注册回调函数（使用register_shrink函数）。然后由PFRA在适当的时机来调用这些回调函数，以触发对相应页面或对象的回收。
 	if (err)
 		goto free_sysfs;
+	//8. 注册文件系统到file_system_type链表
 	err = register_filesystem(&f2fs_fs_type);
 	if (err)
 		goto free_shrinker;
+	//9. 在debugfs中创建目录
 	err = f2fs_create_root_stats();
 	if (err)
 		goto free_filesystem;
