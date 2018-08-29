@@ -37,6 +37,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/f2fs.h>
 
+#define pr_fmt(fmt) KBUILD_MODNAME ":%s:%d: " fmt, __func__, __LINE__
+
 static struct kmem_cache *f2fs_inode_cachep;
 
 #ifdef CONFIG_cF2FS_FAULT_INJECTION
@@ -1243,7 +1245,7 @@ static void default_options(struct f2fs_sb_info *sbi)
 	set_opt(sbi, NOHEAP);
 	sbi->sb->s_flags |= SB_LAZYTIME;
 	set_opt(sbi, FLUSH_MERGE);
-	if (f2fs_sb_mounted_blkzoned(sbi->sb)) {
+	if (f2fs_sb_mounted_blkzoned(sbi->sb)) {//没有进入
 		set_opt_mode(sbi, F2FS_MOUNT_LFS);
 		set_opt(sbi, DISCARD);
 	} else {
@@ -2447,7 +2449,7 @@ static int f2fs_scan_devices(struct f2fs_sb_info *sbi)
 	return 0;
 }
 
-//初始化struct super_block超级块的基本信息
+//初始化struct super_block超级块的基本信息,s_magic(区分不同文件系统)、s_fs_info(记录文件系统超级块的基本信息)
 static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct f2fs_sb_info *sbi;
@@ -2465,6 +2467,7 @@ try_onemore:
 	valid_super_block = -1;
 	recovery = 0;
 
+	
 	/* allocate memory for f2fs-specific super block info */
 	sbi = kzalloc(sizeof(struct f2fs_sb_info), GFP_KERNEL);
 	if (!sbi)
@@ -2487,6 +2490,7 @@ try_onemore:
 		goto free_sbi;
 	}
 
+	//从设备中读取super_block信息
 	err = read_raw_super_block(sbi, &raw_super, &valid_super_block,
 								&recovery);
 	if (err)
@@ -2501,16 +2505,17 @@ try_onemore:
 	sbi->s_resgid = make_kgid(&init_user_ns, F2FS_DEF_RESGID);
 
 	/* precompute checksum seed for metadata */
-	if (f2fs_sb_has_inode_chksum(sb))
+	if (f2fs_sb_has_inode_chksum(sb)){//没有进入条件循环
 		sbi->s_chksum_seed = f2fs_chksum(sbi, ~0, raw_super->uuid,
 						sizeof(raw_super->uuid));
-
+	}
+	
 	/*
 	 * The BLKZONED feature indicates that the drive was formatted with
 	 * zone alignment optimization. This is optional for host-aware
 	 * devices, but mandatory for host-managed zoned block devices.
 	 */
-#ifndef CONFIG_BLK_DEV_ZONED
+#ifndef CONFIG_BLK_DEV_ZONED	//进入这个if
 	if (f2fs_sb_mounted_blkzoned(sb)) {
 		f2fs_msg(sb, KERN_ERR,
 			 "Zoned block device support is not enabled\n");
@@ -2536,15 +2541,22 @@ try_onemore:
 	sb->s_max_links = F2FS_LINK_MAX;
 	get_random_bytes(&sbi->s_next_generation, sizeof(u32));
 
-#ifdef CONFIG_QUOTA
+#ifdef CONFIG_QUOTA//进入了这个if
+	/*
+	Disk quota磁盘配额技术是一种限制文件系统空间使用的技术。在Linux系统中，系统管理员可
+	以通过该技术限制其他用户在指定的容量范围内使用文件系统，从而防止个别用户过量使用而
+	影响到其他的用户，因此早先的磁盘配额技术都是基于user id和group id实现的。本文介绍的
+	project quota技术是社区近来新实现的一种磁盘配额技术，它不再基于用户和组来划分空间，
+	而基于project id实现，限额的粒度可以细到某个目录甚至单个文件，实现对文件系统空间布局进行控制。
+	*/
 	sb->dq_op = &f2fs_quota_operations;
-	if (f2fs_sb_has_quota_ino(sb))
+	if (f2fs_sb_has_quota_ino(sb))// 貌似没有进入if
 		sb->s_qcop = &dquot_quotactl_sysfile_ops;
 	else
 		sb->s_qcop = &f2fs_quotactl_ops;
 	sb->s_quota_types = QTYPE_MASK_USR | QTYPE_MASK_GRP | QTYPE_MASK_PRJ;
 
-	if (f2fs_sb_has_quota_ino(sbi->sb)) {
+	if (f2fs_sb_has_quota_ino(sbi->sb)) {//没有进入这个if
 		for (i = 0; i < MAXQUOTAS; i++) {
 			if (f2fs_qf_ino(sbi->sb, i))
 				sbi->nquota_files++;
@@ -2553,15 +2565,15 @@ try_onemore:
 #endif
 	//初始化super_block的s_op项,sb->s_op= &jffs2_super_operations;
 	sb->s_op = &f2fs_sops;
-#ifdef CONFIG_F2FS_FS_ENCRYPTION
+#ifdef CONFIG_F2FS_FS_ENCRYPTION 	//没有进入if
 	sb->s_cop = &f2fs_cryptops;
 #endif
 	sb->s_xattr = f2fs_xattr_handlers;
 	sb->s_export_op = &f2fs_export_ops;
 	sb->s_magic = F2FS_SUPER_MAGIC;
-	sb->s_time_gran = 1;
+	sb->s_time_gran = 1;//c/m/atime的粒度
 	sb->s_flags = (sb->s_flags & ~SB_POSIXACL) |
-		(test_opt(sbi, POSIX_ACL) ? SB_POSIXACL : 0);
+		(test_opt(sbi, POSIX_ACL) ? SB_POSIXACL : 0);//test_opt = 0
 	memcpy(&sb->s_uuid, raw_super->uuid, sizeof(raw_super->uuid));
 	sb->s_iflags |= SB_I_CGROUPWB;
 
