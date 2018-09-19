@@ -11,7 +11,7 @@
 #ifndef __F2FS_TRACE_H__
 #define __F2FS_TRACE_H__
 
-#ifdef CONFIG_F2FS_IO_TRACE
+//#ifdef CONFIG_F2FS_IO_TRACE
 #include <trace/events/f2fs.h>
 
 enum file_type {
@@ -36,6 +36,7 @@ extern void f2fs_trace_pid(struct page *);
 extern void f2fs_trace_ios(struct f2fs_io_info *, int);
 extern void f2fs_build_trace_ios(void);
 extern void f2fs_destroy_trace_ios(void);
+/*
 #else
 #define f2fs_trace_pid(p)
 #define f2fs_trace_ios(i, n)
@@ -43,4 +44,5 @@ extern void f2fs_destroy_trace_ios(void);
 #define f2fs_destroy_trace_ios()
 
 #endif
+*/
 #endif /* __F2FS_TRACE_H__ */
