@@ -30,6 +30,10 @@
 #include "trace.h"
 #include <trace/events/f2fs.h>
 
+#ifdef AMF_META_LOGGING
+#include "amf_ext.h"
+#endif 
+
 static bool __is_cp_guaranteed(struct page *page)
 {
 	struct address_space *mapping = page->mapping;

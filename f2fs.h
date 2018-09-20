@@ -1222,7 +1222,43 @@ struct f2fs_sb_info {
 	char *s_qf_names[MAXQUOTAS];
 	int s_jquota_fmt;			/* Format of quota to use */
 #endif
+
+
+#ifdef AMF_SNAPSHOT
+	struct amf_info* amfi;
+	spinlock_t mapping_lock;	/* # of physical blks for the mapping table */
+#endif 
+
+#ifdef AMF_PMU
+	struct amf_pmu pmu;
+#endif
+
 };
+
+/* amf newly add */
+
+#ifdef AMF_PMU
+struct amf_pmu {
+	atomic64_t norm_r;
+	atomic64_t norm_w;
+	atomic64_t meta_r;
+	atomic64_t meta_w;
+	atomic64_t fs_gc_rw;
+	atomic64_t metalog_gc_rw;
+	atomic64_t mapping_w;
+	atomic64_t time_norm_r;
+	atomic64_t time_norm_w;
+	atomic64_t ckp_w;
+
+	struct timeval time_start;
+};
+#endif
+
+#ifdef AMF_PMU
+void amf_pmu_create(struct f2fs_sb_info *sbi);
+void amf_pmu_display(struct f2fs_sb_info* sbi);
+#endif
+
 
 #ifdef CONFIG_F2FS_FAULT_INJECTION
 #define f2fs_show_injection_info(type)				\
