@@ -34,6 +34,13 @@
 #include "gc.h"
 #include "trace.h"
 
+
+#include "tgt.h"
+
+#ifdef AMF_SNAPSHOT
+#include "amf_ext.h"
+#endif
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/f2fs.h>
 
@@ -937,6 +944,16 @@ static void f2fs_put_super(struct super_block *sb)
 
 	/* our cp_error case, we can wait for any writeback page */
 	f2fs_flush_merged_writes(sbi);
+
+#ifdef AMF_PMU
+	amf_pmu_display(sbi);
+#endif
+#ifdef AMF_SNAPSHOT
+	amf_write_mappint_entries(sbi);
+	amf_destory_ri(sbi);
+#endif
+
+
 
 	iput(sbi->node_inode);
 	iput(sbi->meta_inode);
@@ -2478,6 +2495,7 @@ static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
 	int recovery, i, valid_super_block;
 	struct curseg_info *seg_i;
 
+	
 try_onemore:
 	err = -EINVAL;
 	raw_super = NULL;
@@ -2613,6 +2631,19 @@ pr_notice("before sb->s_blocksize = size = 0x%x\n",sb->s_blocksize);
 	init_rwsem(&sbi->node_write);
 	init_rwsem(&sbi->node_change);
 
+//add by pmy
+	//add by pmy
+		//修改core.c中nvm_create_tgt()
+	sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
+	struct nvm_tgt_dev * a = sbi->s_lightpblk->tgt_dev;
+	//pr_notice("tgt_dev的geo.nr_luns = 0x%x\n",a->geo.nr_luns);
+	//pr_notice("tgt_dev的geo.nr_luns = 0x%x\n",a->geo.all_luns);
+
+
+//end by pmy
+
+	
+//=====================================================================以上为基本初始化============================================
 	/* disallow all the data/node/meta page writes */
 	//禁止所有data/node/meta page写入
 	set_sbi_flag(sbi, SBI_POR_DOING);
@@ -2650,6 +2681,7 @@ pr_notice("before sb->s_blocksize = size = 0x%x\n",sb->s_blocksize);
 	init_rwsem(&sbi->cp_rwsem);
 	init_waitqueue_head(&sbi->cp_wait);
 	init_sb_info(sbi);
+
 
 	err = init_percpu_info(sbi);
 	if (err)
@@ -2987,9 +3019,15 @@ static void destroy_inodecache(void)
 	kmem_cache_destroy(f2fs_inode_cachep);
 }
 
+
 static int __init init_f2fs_fs(void)
 {
 	int err;
+//add by pmy
+	err =  nvm_register_tgt_type(&tt_tgt);	
+	if(err)
+		pr_notice("nvm_register_tgt_type() error\n");
+//end by pmy
 
 	f2fs_build_trace_ios();
 
@@ -3053,6 +3091,11 @@ fail:
 
 static void __exit exit_f2fs_fs(void)
 {
+//add by pmy
+	//lightpblk_fs_remove();
+	nvm_unregister_tgt_type(&tt_tgt);
+//end by pmy
+
 	f2fs_destroy_root_stats();
 	unregister_filesystem(&f2fs_fs_type);
 	unregister_shrinker(&f2fs_shrinker_info);

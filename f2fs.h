@@ -1223,19 +1223,10 @@ struct f2fs_sb_info {
 	int s_jquota_fmt;			/* Format of quota to use */
 #endif
 
-
-#ifdef AMF_SNAPSHOT
-	struct amf_info* amfi;
-	spinlock_t mapping_lock;	/* # of physical blks for the mapping table */
-#endif 
-
-#ifdef AMF_PMU
-	struct amf_pmu pmu;
-#endif
-
+struct lightpblk *s_lightpblk;//用于nvm_tgt_dev
 };
 
-/* amf newly add */
+/* pmy add start */
 
 #ifdef AMF_PMU
 struct amf_pmu {
@@ -1258,7 +1249,7 @@ struct amf_pmu {
 void amf_pmu_create(struct f2fs_sb_info *sbi);
 void amf_pmu_display(struct f2fs_sb_info* sbi);
 #endif
-
+/* pmy add end */
 
 #ifdef CONFIG_F2FS_FAULT_INJECTION
 #define f2fs_show_injection_info(type)				\

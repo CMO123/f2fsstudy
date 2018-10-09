@@ -508,6 +508,9 @@ next_step:
 		node_page = get_node_page(sbi, nid);
 		if (IS_ERR(node_page))
 			continue;
+#ifdef AMF_PMU
+					atomic64_add (1, &sbi->pmu.fs_gc_rw);
+#endif
 
 		/* block may become invalid during get_node_page */
 		if (check_valid_map(sbi, segno, off) == 0) {
@@ -900,6 +903,9 @@ next_step:
 				up_write(&fi->dio_rwsem[WRITE]);
 				up_write(&fi->dio_rwsem[READ]);
 			}
+#ifdef AMF_PMU
+			atomic64_add (1, &sbi->pmu.fs_gc_rw);
+#endif
 
 			stat_inc_data_blk_count(sbi, 1, gc_type);
 		}
@@ -1019,7 +1025,9 @@ int f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
 				prefree_segments(sbi));
 
 	cpc.reason = __get_cp_reason(sbi);
+#ifndef AMF_SNAPSHOT
 gc_more:
+#endif
 	if (unlikely(!(sbi->sb->s_flags & SB_ACTIVE))) {
 		ret = -EINVAL;
 		goto stop;

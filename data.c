@@ -30,9 +30,7 @@
 #include "trace.h"
 #include <trace/events/f2fs.h>
 
-#ifdef AMF_META_LOGGING
-#include "amf_ext.h"
-#endif 
+
 
 static bool __is_cp_guaranteed(struct page *page)
 {
@@ -241,7 +239,19 @@ submit_io:
 		trace_f2fs_submit_read_bio(sbi->sb, type, bio);
 	else
 		trace_f2fs_submit_write_bio(sbi->sb, type, bio);
+/* pmy add amf start */
+#ifdef AMF_META_LOGGING
+	amf_submit_bio(sbi,bio,type);
+#else
 	submit_bio(bio);
+#ifdef AMF_PMU
+	if(!is_read_io(bio)){
+		atomic64_add(bio_sectors(bio)/8, &sbi->pmu.norm_w);
+	}else{
+		atomic64_add(bio_sectors(bio)/8, &sbi->pmu.norm_r);
+	}
+#endif
+#endif
 }
 
 static void __submit_merged_bio(struct f2fs_bio_info *io)
@@ -380,6 +390,7 @@ void f2fs_flush_merged_writes(struct f2fs_sb_info *sbi)
  */
 int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 {
+	
 	struct bio *bio;
 	struct page *page = fio->encrypted_page ?
 			fio->encrypted_page : fio->page;
@@ -397,8 +408,14 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 		return -EFAULT;
 	}
 	bio_set_op_attrs(bio, fio->op, fio->op_flags);
+#ifdef AMF_META_LOGGING
+			mutex_lock (&sbi->ri->amf_gc_mutex); 
+#endif
 
 	__submit_bio(fio->sbi, bio, fio->type);
+#ifdef AMF_META_LOGGING
+		mutex_unlock (&sbi->ri->amf_gc_mutex); 
+#endif
 
 	if (!is_read_io(fio->op))
 		inc_page_count(fio->sbi, WB_DATA_TYPE(fio->page));
@@ -414,6 +431,19 @@ int f2fs_submit_page_write(struct f2fs_io_info *fio)
 	int err = 0;
 
 	f2fs_bug_on(sbi, is_read_io(fio->op));
+
+#ifdef AMF_META_LOGGING
+		if (is_gc_needed (sbi, get_metalog_free_blks (sbi)) == 0) {
+			if (amf_do_gc (sbi) != 0) {
+				amf_dbg_msg ("[ERROR] risa_do_gc failed\n");
+			}
+		}
+#endif
+
+#ifdef AMF_META_LOGGING
+		mutex_lock (&sbi->ri->amf_gc_mutex); 
+#endif
+
 
 	down_write(&io->io_rwsem);
 next:
@@ -474,6 +504,10 @@ alloc_new:
 		goto next;
 out_fail:
 	up_write(&io->io_rwsem);
+#ifdef AMF_META_LOGGING
+		mutex_unlock (&sbi->ri->amf_gc_mutex); 
+#endif
+
 	return err;
 }
 
@@ -1596,12 +1630,16 @@ bool should_update_outplace(struct inode *inode, struct f2fs_io_info *fio)
 
 static inline bool need_inplace_update(struct f2fs_io_info *fio)
 {
+#ifdef AMF_NO_SSR
+	return false;
+#else
 	struct inode *inode = fio->page->mapping->host;
 
 	if (should_update_outplace(inode, fio))
 		return false;
 
 	return should_update_inplace(inode, fio);
+#endif
 }
 
 static inline bool valid_ipu_blkaddr(struct f2fs_io_info *fio)
