@@ -26,6 +26,7 @@
 #include <linux/f2fs_fs.h>
 #include <linux/sysfs.h>
 #include <linux/quota.h>
+#include <linux/delay.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -44,11 +45,11 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/f2fs.h>
 
-#define pr_fmt(fmt) KBUILD_MODNAME ":%s:%d: " fmt, __func__, __LINE__
+//#define pr_fmt(fmt) KBUILD_MODNAME ":%s:%d: " fmt, __func__, __LINE__
 
 static struct kmem_cache *f2fs_inode_cachep;
 
-#ifdef CONFIG_cF2FS_FAULT_INJECTION
+#ifdef CONFIG_F2FS_FAULT_INJECTION
 
 char *fault_name[FAULT_MAX] = {
 	[FAULT_KMALLOC]		= "kmalloc",
@@ -903,9 +904,20 @@ static void f2fs_put_super(struct super_block *sb)
 	bool dropped;
 
 	f2fs_quota_off_umount(sb);
+#ifdef AMF_PMU
+			amf_pmu_display(sbi);
+#endif
+		
+#ifdef AMF_SNAPSHOT
+			amf_write_mapping_entries(sbi);
+			amf_destory_ri(sbi);
+#endif
+	
 
 	/* prevent remaining shrinker jobs */
 	mutex_lock(&sbi->umount_mutex);
+
+
 
 	/*
 	 * We don't need to do checkpoint when superblock is clean.
@@ -945,15 +957,6 @@ static void f2fs_put_super(struct super_block *sb)
 	/* our cp_error case, we can wait for any writeback page */
 	f2fs_flush_merged_writes(sbi);
 
-#ifdef AMF_PMU
-	amf_pmu_display(sbi);
-#endif
-#ifdef AMF_SNAPSHOT
-	amf_write_mappint_entries(sbi);
-	amf_destory_ri(sbi);
-#endif
-
-
 
 	iput(sbi->node_inode);
 	iput(sbi->meta_inode);
@@ -985,10 +988,11 @@ static void f2fs_put_super(struct super_block *sb)
 
 int f2fs_sync_fs(struct super_block *sb, int sync)
 {
-pr_notice("Enter f2fs_sync_fs()\n");
+
 	struct f2fs_sb_info *sbi = F2FS_SB(sb);
 	int err = 0;
 
+//pr_notice("Enter f2fs_sync_fs()\n");
 	if (unlikely(f2fs_cp_error(sbi)))
 		return 0;
 
@@ -2031,7 +2035,7 @@ static int sanity_check_raw_super(struct f2fs_sb_info *sbi,
 					(bh->b_data + F2FS_SUPER_OFFSET);
 	struct super_block *sb = sbi->sb;
 	unsigned int blocksize;
-
+//pr_notice("Enter santity_check_raw_super()\n");
 	if (F2FS_SUPER_MAGIC != le32_to_cpu(raw_super->magic)) {
 		f2fs_msg(sb, KERN_INFO,
 			"Magic Mismatch, valid(0x%x) - read(0x%x)",
@@ -2103,8 +2107,8 @@ static int sanity_check_raw_super(struct f2fs_sb_info *sbi,
 	}
 
 	/* check CP/SIT/NAT/SSA/MAIN_AREA area boundary */
-	if (sanity_check_area_boundary(sbi, bh))
-		return 1;
+	//if (sanity_check_area_boundary(sbi, bh))
+	//	return 1;
 
 	return 0;
 }
@@ -2312,7 +2316,7 @@ static int read_raw_super_block(struct f2fs_sb_info *sbi,
 	struct buffer_head *bh;
 	struct f2fs_super_block *super;
 	int err = 0;
-
+pr_notice("Enter read_raw_super_block()\n");
 	super = kzalloc(sizeof(struct f2fs_super_block), GFP_KERNEL);
 	if (!super)
 		return -ENOMEM;
@@ -2362,7 +2366,7 @@ int f2fs_commit_super(struct f2fs_sb_info *sbi, bool recover)
 {
 	struct buffer_head *bh;
 	int err;
-
+pr_notice("Enter f2fs_commit_super()\n");
 	if ((recover && f2fs_readonly(sbi->sb)) ||
 				bdev_read_only(sbi->sb->s_bdev)) {
 		set_sbi_flag(sbi, SBI_NEED_SB_WRITE);
@@ -2630,20 +2634,11 @@ pr_notice("before sb->s_blocksize = size = 0x%x\n",sb->s_blocksize);
 	mutex_init(&sbi->cp_mutex);
 	init_rwsem(&sbi->node_write);
 	init_rwsem(&sbi->node_change);
-
-//add by pmy
-	//add by pmy
-		//修改core.c中nvm_create_tgt()
-	sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
-	struct nvm_tgt_dev * a = sbi->s_lightpblk->tgt_dev;
-	//pr_notice("tgt_dev的geo.nr_luns = 0x%x\n",a->geo.nr_luns);
-	//pr_notice("tgt_dev的geo.nr_luns = 0x%x\n",a->geo.all_luns);
-
-
-//end by pmy
-
+//pr_notice("sbi->valid_super_block = %d\n", sbi->valid_super_block);
 	
-//=====================================================================以上为基本初始化============================================
+
+
+
 	/* disallow all the data/node/meta page writes */
 	//禁止所有data/node/meta page写入
 	set_sbi_flag(sbi, SBI_POR_DOING);
@@ -2681,7 +2676,67 @@ pr_notice("before sb->s_blocksize = size = 0x%x\n",sb->s_blocksize);
 	init_rwsem(&sbi->cp_rwsem);
 	init_waitqueue_head(&sbi->cp_wait);
 	init_sb_info(sbi);
+//=====================================================================以上为基本初始化============================================
+sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 
+		
+#ifdef AMF_PMU
+		pr_notice("The size of a checkpoint = %ld (B)\n",sizeof(struct f2fs_checkpoint));//193 B
+		amf_pmu_create(sbi);
+			
+#endif
+		
+	
+#ifdef AMF_SNAPSHOT		
+		spin_lock_init(&sbi->mapping_lock);
+		f2fs_msg(sb, KERN_INFO,"F2FS (RC-1-new) for AMF is initialized\n");
+		
+		
+		if(amf_create_ri(sbi) != 0){
+			f2fs_msg(sb, KERN_ERR, "failed to initialize amf information");
+			goto free_sb_buf;
+		}
+		
+		/*
+		if(amf_build_ri(sbi) !=0){
+			f2fs_msg (sb, KERN_ERR, "Failed to build amf information");
+			goto free_sb_buf;
+		}
+		*/
+	
+	
+		
+			//修改core.c中nvm_create_tgt()
+		
+		struct nvm_tgt_dev * a = sbi->s_lightpblk->tgt_dev;
+		pr_notice("tgt_dev的geo.nr_luns = 0x%x\n",a->geo.nr_luns);
+		pr_notice("tgt_dev的geo.all_luns = 0x%x\n",a->geo.all_luns);
+		int aret;
+		/*aret = tgt_submit_page_erase(sbi, 512,1);
+		
+		mdelay(1000);
+		struct page* apage = alloc_page(GFP_NOFS | __GFP_ZERO);
+		uint8_t* ptr_page_addr = (uint8_t*)page_address(apage);
+		memset(ptr_page_addr,6,PAGE_SIZE);
+		pr_notice("ptr_page_addr1 = %d\n",*ptr_page_addr);
+		
+		aret = tgt_submit_page_write(sbi, apage,512,0);
+		mdelay(10000);
+		*/
+		struct page* bpage = alloc_page(GFP_NOFS | __GFP_ZERO);
+		struct amf_map_blk* ptr_page_addr2 = (struct amf_map_blk*)page_address(bpage);
+		//int* ptr_page_addr2 = (int*)page_address(bpage);
+		aret = tgt_submit_page_read(sbi, bpage, 512);
+		mdelay(1000);
+		//pr_notice("ptr_page_addr2 = %d\n",ptr_page_addr2+256);
+		pr_notice("ptr_page_addr2->magic = %u, ptr_page_addr2->index = %u, ptr_page_addr2->mapping[0]=%u\n", ptr_page_addr2->magic, ptr_page_addr2->index, ptr_page_addr2->mapping[0]);
+		mdelay(20000);
+		
+#endif	
+	
+
+
+//===================================================================================//
 
 	err = init_percpu_info(sbi);
 	if (err)
@@ -2704,6 +2759,7 @@ pr_notice("before sb->s_blocksize = size = 0x%x\n",sb->s_blocksize);
 		err = PTR_ERR(sbi->meta_inode);
 		goto free_io_dummy;
 	}
+	
 
 	//根据sbi信息，得到checkpoint起始地址，读取checkpoint放入sbi->ckpt中。
 	err = get_valid_checkpoint(sbi);
@@ -2711,6 +2767,9 @@ pr_notice("before sb->s_blocksize = size = 0x%x\n",sb->s_blocksize);
 		f2fs_msg(sb, KERN_ERR, "Failed to get valid F2FS checkpoint");
 		goto free_meta_inode;
 	}
+
+	
+	
 
 	/* Initialize device list */
 	//初始化设备链表，从raw_super.devs[i]中拷贝到sbi->devs[i]中

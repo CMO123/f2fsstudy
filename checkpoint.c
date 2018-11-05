@@ -736,11 +736,12 @@ static int get_checkpoint_version(struct f2fs_sb_info *sbi, block_t cp_addr,
 	unsigned long blk_size = sbi->blocksize;
 	size_t crc_offset = 0;
 	__u32 crc = 0;
-
+//pr_notice("get cp_page = %d\n",cp_addr);
 	*cp_page = get_meta_page(sbi, cp_addr);
 	*cp_block = (struct f2fs_checkpoint *)page_address(*cp_page);
 
 	crc_offset = le32_to_cpu((*cp_block)->checksum_offset);
+//pr_notice("crc_offset = %d\n", crc_offset);
 	if (crc_offset > (blk_size - sizeof(__le32))) {
 		f2fs_msg(sbi->sb, KERN_WARNING,
 			"invalid crc_offset: %zu", crc_offset);
@@ -764,7 +765,15 @@ static struct page *validate_checkpoint(struct f2fs_sb_info *sbi,
 	struct f2fs_checkpoint *cp_block = NULL;
 	unsigned long long cur_version = 0, pre_version = 0;
 	int err;
-
+	block_t cp_addr2;
+	
+	if(cp_addr == 2049){
+		
+		cp_addr2 = 2054;
+	}else if(cp_addr ==  2056){
+		
+		cp_addr2 = 2057;
+	}
 	err = get_checkpoint_version(sbi, cp_addr, &cp_block,
 					&cp_page_1, version);//根据cp_addr获得checkpint的cp_block,将版本号填入version中
 	if (err)
@@ -772,8 +781,12 @@ static struct page *validate_checkpoint(struct f2fs_sb_info *sbi,
 	pre_version = *version;
 
 	cp_addr += le32_to_cpu(cp_block->cp_pack_total_block_count) - 1;//计算尾部checkpoint的地址
-	err = get_checkpoint_version(sbi, cp_addr, &cp_block,
+	
+	//pr_notice("cp_addr = %d\n", cp_addr2);
+	err = get_checkpoint_version(sbi, cp_addr2, &cp_block,
 					&cp_page_2, version);
+	//err = get_checkpoint_version(sbi, cp_addr, &cp_block,
+	//				&cp_page_2, version);
 	if (err)
 		goto invalid_cp2;
 	cur_version = *version;
@@ -802,7 +815,7 @@ int get_valid_checkpoint(struct f2fs_sb_info *sbi)
 	unsigned int cp_blks = 1 + __cp_payload(sbi);//1是checkpoint pack的头部，后面payload是实际信息
 	block_t cp_blk_no;
 	int i;
-
+pr_notice("Enter get_valid_checkpoint()\n");
 	sbi->ckpt = f2fs_kzalloc(sbi, cp_blks * blk_size, GFP_KERNEL);
 	if (!sbi->ckpt)
 		return -ENOMEM;
@@ -812,14 +825,17 @@ int get_valid_checkpoint(struct f2fs_sb_info *sbi)
 	 */
 	cp_start_blk_no = le32_to_cpu(fsb->cp_blkaddr);
 	//f2fs:get_valid_checkpoint:808: cp_start_blk_no = 0x200
-pr_notice("checkpoint1的起始地址，cp_start_blk_no1 = 0x%x\n",cp_start_blk_no);
+	cp_start_blk_no =  2049;
+pr_notice("checkpoint1的起始地址，cp_start_blk_no1 = 0x%llx\n",cp_start_blk_no);
 	cp1 = validate_checkpoint(sbi, cp_start_blk_no, &cp1_version);//根据checkpoint起始地址，得到checkpoint1中最新版本
+//pr_notice("cp1_version = %d\n",cp1);
 
 	/* The second checkpoint pack should start at the next segment */
 	// 第二个checkpoint在下一个segment中
 	cp_start_blk_no += ((unsigned long long)1) <<
 				le32_to_cpu(fsb->log_blocks_per_seg);
-pr_notice("checkpoint2的起始地址，cp_start_blk_no2 = 0x%x\n",cp_start_blk_no);
+	cp_start_blk_no = 2056;
+pr_notice("checkpoint2的起始地址，cp_start_blk_no2 = 0x%llx\n",cp_start_blk_no);
 
 	cp2 = validate_checkpoint(sbi, cp_start_blk_no, &cp2_version);
 
@@ -853,6 +869,7 @@ pr_notice("checkpoint2的起始地址，cp_start_blk_no2 = 0x%x\n",cp_start_blk_
 		goto done;
 
 	cp_blk_no = le32_to_cpu(fsb->cp_blkaddr);
+	cp_blk_no = 2049;
 	if (cur_page == cp2)
 		cp_blk_no += 1 << le32_to_cpu(fsb->log_blocks_per_seg);
 

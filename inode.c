@@ -187,13 +187,15 @@ void f2fs_inode_chksum_set(struct f2fs_sb_info *sbi, struct page *page)
 
 static int do_read_inode(struct inode *inode)
 {
-pr_notice("Enter do_read_inode()， inode->i_ino = 0x%x\n",inode->i_ino);
+
 
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct f2fs_inode_info *fi = F2FS_I(inode);
 	struct page *node_page;
 	struct f2fs_inode *ri;
 	projid_t i_projid;
+
+pr_notice("Enter do_read_inode()， inode->i_ino = 0x%lx\n",inode->i_ino);
 
 	/* Check if ino is within scope */
 	if (check_nid_range(sbi, inode->i_ino)) {
@@ -297,14 +299,16 @@ pr_notice("Enter do_read_inode()， inode->i_ino = 0x%x\n",inode->i_ino);
 
 struct inode *f2fs_iget(struct super_block *sb, unsigned long ino)
 {//返回已经存在的inode，或者通过alloc_inode重新分配一个，并看不同的node类型设置不同的op
-pr_notice("Enter f2fs_iget(), ino = 0x%x -------------------------------\n", ino);
+
 	struct f2fs_sb_info *sbi = F2FS_SB(sb);
 	struct inode *inode;
 	int ret = 0;
 
+pr_notice("Enter f2fs_iget(), ino = 0x%lx -------------------------------\n", ino);
+
 	inode = iget_locked(sb, ino);//从已挂载文件系统中获得ino的inode，如果没有则利用f2fs的alloc_inode重新分配一个，新的话带有标志I_NEW
 	//第一次在fill_super中调用创建sbi->meta_inode时，inode->i_state & I_NEW = 0x8, 是新创建的inode
-pr_notice("inode is newly create?? inode->i_state & I_NEW =0x%x\n",inode->i_state & I_NEW);
+pr_notice("inode is newly create?? inode->i_state & I_NEW =0x%lx\n",inode->i_state & I_NEW);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
 

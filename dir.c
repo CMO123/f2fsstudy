@@ -850,7 +850,7 @@ int f2fs_fill_dentries(struct dir_context *ctx, struct f2fs_dentry_ptr *d,
 
 static int f2fs_readdir(struct file *file, struct dir_context *ctx)
 {
-pr_notice("Enter f2fs_readdir()------------------------------------\n");
+
 	struct inode *inode = file_inode(file);
 	unsigned long npages = dir_blocks(inode);
 	struct f2fs_dentry_block *dentry_blk = NULL;
@@ -861,6 +861,8 @@ pr_notice("Enter f2fs_readdir()------------------------------------\n");
 	struct f2fs_dentry_ptr d;
 	struct fscrypt_str fstr = FSTR_INIT(NULL, 0);
 	int err = 0;
+
+pr_notice("Enter f2fs_readdir()------------------------------------\n");
 
 	if (f2fs_encrypted_inode(inode)) {
 		err = fscrypt_get_encryption_info(inode);

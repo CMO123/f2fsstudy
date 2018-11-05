@@ -26,6 +26,7 @@
 #include "trace.h"
 #include <trace/events/f2fs.h>
 
+#include "tgt.h"
 #ifdef AMF_SNAPSHOT
 #include "amf_ext.h"
 #endif
@@ -803,7 +804,9 @@ static void locate_dirty_segment(struct f2fs_sb_info *sbi, unsigned int segno)
 	mutex_unlock(&dirty_i->seglist_lock);
 #ifdef AMF_TRIM
 	if(valid_blocks == 0){
-		amf_do_trim(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
+		//amf_do_trim(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
+		//f2fs_issue_discard(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
+		tgt_submit_page_erase(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
 	}
 #endif
 	
@@ -2417,6 +2420,7 @@ static void allocate_segment_by_default(struct f2fs_sb_info *sbi,
 	struct curseg_info *curseg = CURSEG_I(sbi, type);
 
 #ifdef AMF_NO_SSR
+	//如果没有free segments，我们给GC一个高优先级，是之能创建更多的segment
 	while(free_segments(sbi) == 0)
 		cond_resched();
 #endif
@@ -2766,6 +2770,13 @@ void write_meta_page(struct f2fs_sb_info *sbi, struct page *page,
 		fio.op_flags &= ~REQ_META;
 
 	set_page_writeback(page);
+#ifdef AMF_META_LOGGING
+		if (is_gc_needed (sbi, get_metalog_free_blks (sbi)) == 0) {
+			if (amf_do_gc (sbi) != 0) {
+				amf_dbg_msg ("[ERROR] risa_do_gc failed\n");
+			}
+		}
+#endif
 	f2fs_submit_page_write(&fio);
 
 	f2fs_update_iostat(sbi, io_type, F2FS_BLKSIZE);
@@ -3005,7 +3016,6 @@ static void read_compacted_summaries(struct f2fs_sb_info *sbi)
 
 static int read_normal_summaries(struct f2fs_sb_info *sbi, int type)
 {
-pr_notice("Enter read_normal_summaries()--------------------------\n");
 	struct f2fs_checkpoint *ckpt = F2FS_CKPT(sbi);
 	struct f2fs_summary_block *sum;
 	struct curseg_info *curseg;

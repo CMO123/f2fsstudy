@@ -1118,7 +1118,7 @@ static int read_node_page(struct page *page, int op_flags)
 
 	if (PageUptodate(page))
 		return LOCKED_PAGE;
-pr_notice("page->index = 0x%x\n",page->index);
+pr_notice("page->index = 0x%lx\n",page->index);
 	get_node_info(sbi, page->index, &ni);
 
 	if (unlikely(ni.blk_addr == NULL_ADDR)) {

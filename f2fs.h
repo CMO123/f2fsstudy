@@ -29,7 +29,8 @@
 #define __FS_HAS_ENCRYPTION IS_ENABLED(CONFIG_F2FS_FS_ENCRYPTION)
 #include <linux/fscrypt.h>
 
-#define pr_fmt(fmt) KBUILD_MODNAME ":%s:%d: " fmt, __func__, __LINE__
+//#define pr_fmt(fmt) KBUILD_MODNAME ":%s:%d: " fmt, __func__, __LINE__
+
 
 #ifdef CONFIG_F2FS_CHECK_FS
 #define f2fs_bug_on(sbi, condition)	BUG_ON(condition)
@@ -1038,6 +1039,32 @@ enum {
 	REQ_TIME,
 	MAX_TIME,
 };
+	/* start */
+	
+	
+	
+
+struct amf_pmu {
+	atomic64_t norm_r;
+	atomic64_t norm_w;
+	atomic64_t meta_r;
+	atomic64_t meta_w;
+	atomic64_t fs_gc_rw;
+	atomic64_t metalog_gc_rw;
+	atomic64_t mapping_w;
+	atomic64_t time_norm_r;
+	atomic64_t time_norm_w;
+	atomic64_t ckp_w;
+
+	struct timeval time_start;
+};
+	
+	
+void amf_pmu_create (struct f2fs_sb_info *sbi);
+void amf_pmu_display(struct f2fs_sb_info* sbi);
+
+	
+	/* pamf add end */
 
 struct f2fs_sb_info {
 	struct super_block *sb;			/* pointer to VFS super block */
@@ -1224,32 +1251,22 @@ struct f2fs_sb_info {
 #endif
 
 struct lightpblk *s_lightpblk;//用于nvm_tgt_dev
+
+
+#ifdef AMF_SNAPSHOT
+	struct amf_info* ri;
+	spinlock_t mapping_lock;
+	// pamf add start
+
+#endif
+#ifdef AMF_PMU
+	struct amf_pmu pmu;
+#endif
+//pamf add end
 };
 
-/* pmy add start */
+/* pamf add start */
 
-#ifdef AMF_PMU
-struct amf_pmu {
-	atomic64_t norm_r;
-	atomic64_t norm_w;
-	atomic64_t meta_r;
-	atomic64_t meta_w;
-	atomic64_t fs_gc_rw;
-	atomic64_t metalog_gc_rw;
-	atomic64_t mapping_w;
-	atomic64_t time_norm_r;
-	atomic64_t time_norm_w;
-	atomic64_t ckp_w;
-
-	struct timeval time_start;
-};
-#endif
-
-#ifdef AMF_PMU
-void amf_pmu_create(struct f2fs_sb_info *sbi);
-void amf_pmu_display(struct f2fs_sb_info* sbi);
-#endif
-/* pmy add end */
 
 #ifdef CONFIG_F2FS_FAULT_INJECTION
 #define f2fs_show_injection_info(type)				\
@@ -1339,6 +1356,8 @@ static inline u32 f2fs_crc32(struct f2fs_sb_info *sbi, const void *address,
 static inline bool f2fs_crc_valid(struct f2fs_sb_info *sbi, __u32 blk_crc,
 				  void *buf, size_t buf_size)
 {
+	pr_notice("blk_crc = %d\n", blk_crc);
+	pr_notice("f2fs_crc32(sbi, buf, buf_size) = %d\n",f2fs_crc32(sbi, buf, buf_size));
 	return f2fs_crc32(sbi, buf, buf_size) == blk_crc;
 }
 

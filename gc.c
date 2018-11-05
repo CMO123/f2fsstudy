@@ -23,6 +23,12 @@
 #include "gc.h"
 #include <trace/events/f2fs.h>
 
+
+#include "tgt.h"
+#ifdef AMF_TRIM
+#include "amf_ext.h"
+#endif
+
 static int gc_thread_func(void *data)
 {
 	struct f2fs_sb_info *sbi = data;
@@ -509,7 +515,7 @@ next_step:
 		if (IS_ERR(node_page))
 			continue;
 #ifdef AMF_PMU
-					atomic64_add (1, &sbi->pmu.fs_gc_rw);
+		atomic64_add (1, &sbi->pmu.fs_gc_rw);
 #endif
 
 		/* block may become invalid during get_node_page */
@@ -1001,7 +1007,7 @@ next:
 
 	return seg_freed;
 }
-
+#ifndef AMF_BETA
 int f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
 			bool background, unsigned int segno)
 {
@@ -1025,9 +1031,8 @@ int f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
 				prefree_segments(sbi));
 
 	cpc.reason = __get_cp_reason(sbi);
-#ifndef AMF_SNAPSHOT
+
 gc_more:
-#endif
 	if (unlikely(!(sbi->sb->s_flags & SB_ACTIVE))) {
 		ret = -EINVAL;
 		goto stop;
@@ -1061,8 +1066,14 @@ gc_more:
 		ret = -ENODATA;
 		goto stop;
 	}
-
+#ifdef AMF_TRIM
 	seg_freed = do_garbage_collect(sbi, segno, &gc_list, gc_type);
+	//f2fs_issue_discard(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
+	ret = tgt_submit_page_erase(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
+#else
+	seg_freed = do_garbage_collect(sbi, segno, &gc_list, gc_type);
+#endif
+
 	if (gc_type == FG_GC && seg_freed == sbi->segs_per_sec)
 		sec_freed++;
 	total_freed += seg_freed;
@@ -1100,6 +1111,129 @@ stop:
 		ret = sec_freed ? 0 : -EAGAIN;
 	return ret;
 }
+#else
+
+int __f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
+			bool background, unsigned int segno)
+{
+	int gc_type = sync ? FG_GC : BG_GC;
+	int sec_freed = 0, seg_freed = 0, total_freed = 0;
+	int ret = 0;
+	struct cp_control cpc;
+	unsigned int init_segno = segno;
+	struct gc_inode_list gc_list = {
+		.ilist = LIST_HEAD_INIT(gc_list.ilist),
+		.iroot = RADIX_TREE_INIT(GFP_NOFS),
+	};
+
+	trace_f2fs_gc_begin(sbi->sb, sync, background,
+				get_pages(sbi, F2FS_DIRTY_NODES),
+				get_pages(sbi, F2FS_DIRTY_DENTS),
+				get_pages(sbi, F2FS_DIRTY_IMETA),
+				free_sections(sbi),
+				free_segments(sbi),
+				reserved_segments(sbi),
+				prefree_segments(sbi));
+
+	cpc.reason = __get_cp_reason(sbi);
+
+gc_more:
+	if (unlikely(!(sbi->sb->s_flags & SB_ACTIVE))) {
+		ret = -EINVAL;
+		goto stop;
+	}
+	if (unlikely(f2fs_cp_error(sbi))) {
+		ret = -EIO;
+		goto stop;
+	}
+
+	if (gc_type == BG_GC && has_not_enough_free_secs(sbi, 0, 0)) {
+		/*
+		 * For example, if there are many prefree_segments below given
+		 * threshold, we can make them free by checkpoint. Then, we
+		 * secure free segments which doesn't need fggc any more.
+		 */
+		if (prefree_segments(sbi)) {
+			ret = write_checkpoint(sbi, &cpc);
+			if (ret)
+				goto stop;
+		}
+		if (has_not_enough_free_secs(sbi, 0, 0))
+			gc_type = FG_GC;
+	}
+
+	/* f2fs_balance_fs doesn't need to do BG_GC in critical path. */
+	if (gc_type == BG_GC && !background) {
+		ret = -EINVAL;
+		goto stop;
+	}
+	if (!__get_victim(sbi, &segno, gc_type)) {
+		ret = -ENODATA;
+		goto stop;
+	}
+#ifdef AMF_TRIM
+	seg_freed = do_garbage_collect(sbi, segno, &gc_list, gc_type);
+	//f2fs_issue_discard(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
+	ret = tgt_submit_erase(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
+#else
+	seg_freed = do_garbage_collect(sbi, segno, &gc_list, gc_type);
+#endif
+
+	if (gc_type == FG_GC && seg_freed == sbi->segs_per_sec)
+		sec_freed++;
+	total_freed += seg_freed;
+
+	if (gc_type == FG_GC)
+		sbi->cur_victim_sec = NULL_SEGNO;
+
+	if (!sync) {
+		if (has_not_enough_free_secs(sbi, sec_freed, 0)) {
+			segno = NULL_SEGNO;
+			goto gc_more;
+		}
+
+		if (gc_type == FG_GC)
+			ret = write_checkpoint(sbi, &cpc);
+	}
+stop:
+	SIT_I(sbi)->last_victim[ALLOC_NEXT] = 0;
+	SIT_I(sbi)->last_victim[FLUSH_DEVICE] = init_segno;
+
+	trace_f2fs_gc_end(sbi->sb, ret, total_freed, sec_freed,
+				get_pages(sbi, F2FS_DIRTY_NODES),
+				get_pages(sbi, F2FS_DIRTY_DENTS),
+				get_pages(sbi, F2FS_DIRTY_IMETA),
+				free_sections(sbi),
+				free_segments(sbi),
+				reserved_segments(sbi),
+				prefree_segments(sbi));
+
+	mutex_unlock(&sbi->gc_mutex);
+
+	put_gc_inode(&gc_list);
+
+	if (sync)
+		ret = sec_freed ? 0 : -EAGAIN;
+	return ret;
+
+}
+
+int f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
+			bool background, unsigned int segno)
+{
+	int loop=0;
+	int max = 16;
+	int ret = -1;
+
+	for(loop = 0; loop < max; loop++){
+		ret = __f2fs_gc(sbi,sync,background,segno);
+		if(ret == -1)
+			break;
+	}
+	return ret;
+}
+#endif
+
 
 void build_gc_manager(struct f2fs_sb_info *sbi)
 {//设定GC的ops

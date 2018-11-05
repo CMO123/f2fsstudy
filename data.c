@@ -30,7 +30,9 @@
 #include "trace.h"
 #include <trace/events/f2fs.h>
 
-
+#ifdef AMF_META_LOGGING
+#include "amf_ext.h"
+#endif
 
 static bool __is_cp_guaranteed(struct page *page)
 {
@@ -197,7 +199,6 @@ static inline void __submit_bio(struct f2fs_sb_info *sbi,
 {//读操作，直接提交，非读操作，需填充对齐
 	if (!is_read_io(bio_op(bio))) {//非read
 		unsigned int start;
-pr_notice("!is_read_io()\n");
 		if (f2fs_sb_mounted_blkzoned(sbi->sb) &&
 			current->plug && (type == DATA || type == NODE))
 			blk_finish_plug(current->plug);
@@ -206,10 +207,7 @@ pr_notice("!is_read_io()\n");
 			goto submit_io;
 
 		start = bio->bi_iter.bi_size >> F2FS_BLKSIZE_BITS;
-pr_notice("start=0x%x\n",start);
 		start %= F2FS_IO_SIZE(sbi);
-pr_notice("F2FS_IO_SIZE = 0x%x\n",F2FS_IO_SIZE(sbi));
-pr_notice("start=0x%x\n",start);
 
 		if (start == 0)
 			goto submit_io;
@@ -239,23 +237,32 @@ submit_io:
 		trace_f2fs_submit_read_bio(sbi->sb, type, bio);
 	else
 		trace_f2fs_submit_write_bio(sbi->sb, type, bio);
-/* pmy add amf start */
+/* pamf add start */
 #ifdef AMF_META_LOGGING
-	amf_submit_bio(sbi,bio,type);
+	amf_submit_bio(sbi,bio, type);
 #else
-	submit_bio(bio);
 #ifdef AMF_PMU
-	if(!is_read_io(bio)){
-		atomic64_add(bio_sectors(bio)/8, &sbi->pmu.norm_w);
-	}else{
-		atomic64_add(bio_sectors(bio)/8, &sbi->pmu.norm_r);
-	}
+		if(!is_read_io(bio)){
+			atomic64_add(bio_sectors(bio)/8, &sbi->pmu.norm_w);
+		}else{
+			atomic64_add(bio_sectors(bio)/8, &sbi->pmu.norm_r);
+		}
 #endif
+	submit_bio(bio);
+
 #endif
 }
 
 static void __submit_merged_bio(struct f2fs_bio_info *io)
 {
+#ifdef AMF_META_LOGGING
+	if (is_gc_needed (io->sbi, get_metalog_free_blks (io->sbi)) == 0) {
+		if (amf_do_gc (io->sbi) != 0) {
+			amf_dbg_msg ("[ERROR] amf_do_gc failed\n");
+		}
+	}
+#endif
+
 	struct f2fs_io_info *fio = &io->fio;
 
 	if (!io->bio)
@@ -268,7 +275,22 @@ static void __submit_merged_bio(struct f2fs_bio_info *io)
 	else
 		trace_f2fs_prepare_write_bio(io->sbi->sb, fio->type, io->bio);
 
+	//__submit_bio(io->sbi, io->bio, fio->type);
+#ifdef AMF_META_LOGGING
+	mutex_lock (&io->sbi->ri->amf_gc_mutex);
+	amf_submit_bio(io->sbi, io->bio, fio->type);
+	mutex_unlock (&io->sbi->ri->amf_gc_mutex); 
+#else
 	__submit_bio(io->sbi, io->bio, fio->type);
+#ifdef AMF_PMU
+	if (!is_read_io(bio_op(bio))) {
+		atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_w);
+	} else {
+		atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_r);
+	}
+#endif
+#endif				
+
 	io->bio = NULL;
 }
 
@@ -390,7 +412,15 @@ void f2fs_flush_merged_writes(struct f2fs_sb_info *sbi)
  */
 int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 {
-	
+
+#ifdef AMF_META_LOGGING
+	if (is_gc_needed (fio->sbi, get_metalog_free_blks (fio->sbi)) == 0) {
+		if (amf_do_gc (fio->sbi) != 0) {
+			amf_dbg_msg ("[ERROR] risa_do_gc failed\n");
+		}
+	}
+#endif
+
 	struct bio *bio;
 	struct page *page = fio->encrypted_page ?
 			fio->encrypted_page : fio->page;
@@ -409,13 +439,22 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 	}
 	bio_set_op_attrs(bio, fio->op, fio->op_flags);
 #ifdef AMF_META_LOGGING
-			mutex_lock (&sbi->ri->amf_gc_mutex); 
-#endif
-
+	mutex_lock (&fio->sbi->ri->amf_gc_mutex); 
+	amf_submit_bio(fio->sbi, bio, fio->type);
+	mutex_unlock (&fio->sbi->ri->amf_gc_mutex); 
+#else
 	__submit_bio(fio->sbi, bio, fio->type);
-#ifdef AMF_META_LOGGING
-		mutex_unlock (&sbi->ri->amf_gc_mutex); 
+#ifdef AMF_PMU
+	if (!is_read_io(bio_op(bio))) {
+		atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_w);
+	} else {
+		atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_r);
+	}
 #endif
+#endif				
+
+	//__submit_bio(fio->sbi, bio, fio->type);
+
 
 	if (!is_read_io(fio->op))
 		inc_page_count(fio->sbi, WB_DATA_TYPE(fio->page));
@@ -431,18 +470,6 @@ int f2fs_submit_page_write(struct f2fs_io_info *fio)
 	int err = 0;
 
 	f2fs_bug_on(sbi, is_read_io(fio->op));
-
-#ifdef AMF_META_LOGGING
-		if (is_gc_needed (sbi, get_metalog_free_blks (sbi)) == 0) {
-			if (amf_do_gc (sbi) != 0) {
-				amf_dbg_msg ("[ERROR] risa_do_gc failed\n");
-			}
-		}
-#endif
-
-#ifdef AMF_META_LOGGING
-		mutex_lock (&sbi->ri->amf_gc_mutex); 
-#endif
 
 
 	down_write(&io->io_rwsem);
@@ -504,9 +531,7 @@ alloc_new:
 		goto next;
 out_fail:
 	up_write(&io->io_rwsem);
-#ifdef AMF_META_LOGGING
-		mutex_unlock (&sbi->ri->amf_gc_mutex); 
-#endif
+
 
 	return err;
 }
@@ -545,8 +570,8 @@ static struct bio *f2fs_grab_read_bio(struct inode *inode, block_t blkaddr,
 static int f2fs_submit_page_read(struct inode *inode, struct page *page,
 							block_t blkaddr)
 {
-pr_notice("Enter f2fs_submit_page_read()\n");
 	struct bio *bio = f2fs_grab_read_bio(inode, blkaddr, 1);
+pr_notice("Enter f2fs_submit_page_read()\n");
 
 	if (IS_ERR(bio))
 		return PTR_ERR(bio);
@@ -555,7 +580,20 @@ pr_notice("Enter f2fs_submit_page_read()\n");
 		bio_put(bio);
 		return -EFAULT;
 	}
-	__submit_bio(F2FS_I_SB(inode), bio, DATA);
+	//__submit_bio(F2FS_I_SB(inode), bio, DATA);
+#ifdef AMF_META_LOGGING
+		amf_submit_bio(F2FS_I_SB(inode), bio, DATA);
+#else
+		__submit_bio(F2FS_I_SB(inode), bio, DATA);
+#ifdef AMF_PMU
+		if (!is_read_io(bio_op(bio))) {
+			atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_w);
+		} else {
+			atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_r);
+		}
+#endif
+#endif				
+
 	return 0;
 }
 
@@ -1377,11 +1415,23 @@ out:
 /*
  * This function was originally taken from fs/mpage.c, and customized for f2fs.
  * Major change was from block_size == page_size in f2fs by default.
- */
+ 
+ *do_mpage_readpage:
+ 这个函数试图读取文件中的一个page大小的数据，最理想的情况下就是这个page大小 
+的数据都是在连续的物理磁盘上面的，然后函数只需要提交一个bio请求就可以获取 
+所有的数据，这个函数大部分工作在检查page上所有的物理块是否连续，检查的方法 
+就是调用文件系统提供的get_block函数，如果不连续，需要调用block_read_full_page 
+函数采用buffer 缓冲区的形式来逐个块获取数据
+ 
+    1、调用get_block函数检查page中是不是所有的物理块都连续 
+    2、如果连续调用mpage_bio_submit函数请求整个page的数据 
+    3、如果不连续调用block_read_full_page逐个block读取 
+*/
 static int f2fs_mpage_readpages(struct address_space *mapping,
 			struct list_head *pages, struct page *page,
 			unsigned nr_pages)
 {
+
 	struct bio *bio = NULL;
 	sector_t last_block_in_bio = 0;
 	struct inode *inode = mapping->host;
@@ -1392,6 +1442,8 @@ static int f2fs_mpage_readpages(struct address_space *mapping,
 	sector_t last_block_in_file;
 	sector_t block_nr;
 	struct f2fs_map_blocks map;
+
+pr_notice("Enter f2fs_mpage_readpages()\n");
 
 	map.m_pblk = 0;
 	map.m_lblk = 0;
@@ -1466,7 +1518,19 @@ got_it:
 		if (bio && (last_block_in_bio != block_nr - 1 ||
 			!__same_bdev(F2FS_I_SB(inode), block_nr, bio))) {
 submit_and_realloc:
+#ifdef AMF_META_LOGGING
+			amf_submit_bio(F2FS_I_SB(inode), bio, DATA);
+#else
 			__submit_bio(F2FS_I_SB(inode), bio, DATA);
+#ifdef AMF_PMU
+			
+			if (!is_read_io(bio_op(bio))) {
+				atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_w);
+			} else {
+				atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_r);
+			}
+#endif
+#endif
 			bio = NULL;
 		}
 		if (bio == NULL) {
@@ -1489,7 +1553,19 @@ set_error_page:
 		goto next_page;
 confused:
 		if (bio) {
+#ifdef AMF_META_LOGGING
+			amf_submit_bio(F2FS_I_SB(inode), bio, DATA);
+#else
 			__submit_bio(F2FS_I_SB(inode), bio, DATA);
+#ifdef AMF_PMU
+			
+			if (!is_read_io(bio_op(bio))) {
+				atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_w);
+			} else {
+				atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_r);
+			}
+#endif
+#endif				
 			bio = NULL;
 		}
 		unlock_page(page);
@@ -1498,14 +1574,27 @@ next_page:
 			put_page(page);
 	}
 	BUG_ON(pages && !list_empty(pages));
-	if (bio)
-		__submit_bio(F2FS_I_SB(inode), bio, DATA);
+	if (bio){
+#ifdef AMF_META_LOGGING
+			amf_submit_bio(F2FS_I_SB(inode), bio, DATA);
+#else
+			__submit_bio(F2FS_I_SB(inode), bio, DATA);
+#ifdef AMF_PMU
+			
+			if (!is_read_io(bio_op(bio))) {
+				atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_w);
+			} else {
+				atomic64_add (bio_sectors (bio) / 8, &F2FS_I_SB(inode)->pmu.norm_r);
+			}
+#endif
+#endif				
+	}
 	return 0;
 }
 
 static int f2fs_read_data_page(struct file *file, struct page *page)
 {
-pr_notice("Enter f2fs_read_data_page()----------------------\n");
+
 	struct inode *inode = page->mapping->host;
 	int ret = -EAGAIN;
 
@@ -1523,7 +1612,7 @@ static int f2fs_read_data_pages(struct file *file,
 			struct address_space *mapping,
 			struct list_head *pages, unsigned nr_pages)
 {
-pr_notice("Enter f2fs_read_data_pages()-----------------------\n");
+
 	struct inode *inode = mapping->host;
 	struct page *page = list_last_entry(pages, struct page, lru);
 
@@ -1739,7 +1828,7 @@ static int __write_data_page(struct page *page, bool *submitted,
 				struct writeback_control *wbc,
 				enum iostat_type io_type)
 {
-pr_notice("Enter __write_data_page()--------------------\n");
+
 	struct inode *inode = page->mapping->host;
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	loff_t i_size = i_size_read(inode);
@@ -1763,6 +1852,7 @@ pr_notice("Enter __write_data_page()--------------------\n");
 		.io_type = io_type,
 		.io_wbc = wbc,
 	};
+	
 
 	trace_f2fs_writepage(page, DATA);
 
