@@ -2724,12 +2724,12 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		mdelay(10000);
 		*/
 		struct page* bpage = alloc_page(GFP_NOFS | __GFP_ZERO);
-		struct amf_map_blk* ptr_page_addr2 = (struct amf_map_blk*)page_address(bpage);
-		//int* ptr_page_addr2 = (int*)page_address(bpage);
-		aret = tgt_submit_page_read(sbi, bpage, 512);
+		//struct amf_map_blk* ptr_page_addr2 = (struct amf_map_blk*)page_address(bpage);
+		char* ptr_page_addr2 = (char*)page_address(bpage);
+		aret = tgt_submit_page_read(sbi, bpage, 500*8);
 		mdelay(1000);
-		//pr_notice("ptr_page_addr2 = %d\n",ptr_page_addr2+256);
-		pr_notice("ptr_page_addr2->magic = %u, ptr_page_addr2->index = %u, ptr_page_addr2->mapping[0]=%u\n", ptr_page_addr2->magic, ptr_page_addr2->index, ptr_page_addr2->mapping[0]);
+		pr_notice("ptr_page_addr2 = %s\n",ptr_page_addr2);
+		//pr_notice("ptr_page_addr2->magic = %u, ptr_page_addr2->index = %u, ptr_page_addr2->mapping[0]=%u\n", ptr_page_addr2->magic, ptr_page_addr2->index, ptr_page_addr2->mapping[0]);
 		mdelay(20000);
 		
 #endif	
