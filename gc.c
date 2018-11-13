@@ -1069,7 +1069,7 @@ gc_more:
 #ifdef AMF_TRIM
 	seg_freed = do_garbage_collect(sbi, segno, &gc_list, gc_type);
 	//f2fs_issue_discard(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
-	ret = tgt_submit_page_erase(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
+	ret = tgt_submit_addr_erase_async(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
 #else
 	seg_freed = do_garbage_collect(sbi, segno, &gc_list, gc_type);
 #endif

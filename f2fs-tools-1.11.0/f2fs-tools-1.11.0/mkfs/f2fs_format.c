@@ -1337,6 +1337,14 @@ static int f2fs_write_super_block(void)
 			free(zero_buff);
 			return -1;
 		}
+		/*
+		if (dev_write_block(zero_buff, index)) {
+				MSG(1, "\tError: While while writing supe_blk "
+						"on disk!!! index : %d\n", index);
+				free(zero_buff);
+				return -1;
+			}
+		*/
 	}
 #else
 	DBG(1, "\tWriting super block, at offset 0x%08x\n", 0);
@@ -2158,9 +2166,9 @@ int f2fs_format_device(void)
 			
 			buf_w_nbytes = naddrs * nvmgeo->sector_nbytes;
 			buf_r_nbytes = nvmgeo->sector_nbytes;
-		
 			
-			addr1 = nvm_addr_dev2gen(nvmdev, 500);
+			
+			addr1 = nvm_addr_dev2gen(nvmdev, 550);
 			nvm_addr_pr(addr1);//0x0000 0001 0000 0000
 			
 			buf_w = nvm_buf_alloc(nvmgeo, buf_w_nbytes);
@@ -2174,15 +2182,18 @@ int f2fs_format_device(void)
 				
 			}
 			
-			nvm_buf_fill(buf_w, buf_w_nbytes);
+			//nvm_buf_fill(buf_w, buf_w_nbytes);
 			memset(buf_r, 0, buf_r_nbytes);
 			
 			//err = nvm_addr_erase(nvmdev, &addr1, 1, 1, &ret);
-			err = nvm_addr_write(nvmdev, &addr1, 1, buf_w, NULL, 1, &ret);
-			//err = nvm_addr_read(nvmdev, &addr1, 1, buf_r, NULL, 1, &ret);
-			printf("buf_w = %s\n",buf_w);
-
+			//err = nvm_addr_write(nvmdev, &addr1, 1, buf_w, NULL, 1, &ret);
+			err = nvm_addr_read(nvmdev, &addr1, 1, buf_r, NULL, 1, &ret);
+			//printf("buf_w = %s\n",buf_w);
+			printf("buf_r = %s\n",buf_r);
+			struct amf_map_blk* ptr = (struct amf_map_blk*)buf_r;
+			printf("ptr->magic = %d,ptr->index = %d,ptr->mapping[0] = %d\n",ptr->magic,ptr->index,ptr->mapping[0]);
 			*/
+			
 
 			
 #endif
@@ -2237,6 +2248,47 @@ int f2fs_format_device(void)
 			MSG(0, "\tError: Failed to write the snapshot!!!\n");
 			goto exit;
 		}
+
+		/*
+		//测试读写
+					struct nvm_addr addr1;
+					char *buf_w = NULL,*buf_r = NULL;
+					size_t buf_w_nbytes, buf_r_nbytes;
+					struct nvm_ret ret;
+					const int naddrs = nvmgeo->nplanes * nvmgeo->nsectors;
+					printf("naddrs = %d\n",naddrs);
+					
+					buf_w_nbytes = naddrs * nvmgeo->sector_nbytes;
+					buf_r_nbytes = nvmgeo->sector_nbytes;
+					
+					
+					addr1 = nvm_addr_dev2gen(nvmdev, 541);
+					nvm_addr_pr(addr1);//0x0000 0001 0000 0000
+					
+					buf_w = nvm_buf_alloc(nvmgeo, buf_w_nbytes);
+					buf_r = nvm_buf_alloc(nvmgeo, buf_r_nbytes);
+					if (!buf_w) {
+						printf("error: nvm_buf_alloc\n");
+						
+					}
+					if (!buf_r) {
+						printf("error:nvm_buf_alloc");
+						
+					}
+					
+					//nvm_buf_fill(buf_w, buf_w_nbytes);
+					memset(buf_r, 0, buf_r_nbytes);
+					
+					//err = nvm_addr_erase(nvmdev, &addr1, 1, 1, &ret);
+					//err = nvm_addr_write(nvmdev, &addr1, 1, buf_w, NULL, 1, &ret);
+					err = nvm_addr_read(nvmdev, &addr1, 1, buf_r, NULL, 1, &ret);
+					printf("err = %d\n",err);
+					printf("ret.status = 0x%x, ret.result = 0x%x\n",ret.status, ret.result);
+					//printf("buf_w = %s\n",buf_w);
+					printf("buf_r = %s\n",buf_r);
+					struct amf_map_blk* ptr = (struct amf_map_blk*)buf_r;
+					printf("ptr->magic = %d,ptr->index = %d,ptr->mapping[0] = %d\n",ptr->magic,ptr->index,ptr->mapping[0]);
+		*/
 #endif
 
 
@@ -2318,51 +2370,51 @@ int f2fs_write_snapshot(void)
 		
 		map_ofs = ofs+0-segment0_blkaddr;
 		ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020] = cpu_to_le32(ofs+1);
-		dbg_log("map_ofs = %u \n", map_ofs);
-		dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
+		//dbg_log("map_ofs = %u \n", map_ofs);
+		//dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
 
 		
 		map_ofs = ofs+1-segment0_blkaddr;
 		ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020] = cpu_to_le32(ofs+2);
-		dbg_log("map_ofs = %u \n", map_ofs);
-		dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
+		//dbg_log("map_ofs = %u \n", map_ofs);
+		//dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
 
 		
 		map_ofs = ofs+2-segment0_blkaddr;
 		ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020] = cpu_to_le32(ofs+3);
-		dbg_log("map_ofs = %u \n", map_ofs);
-		dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
+		//dbg_log("map_ofs = %u \n", map_ofs);
+		//dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
 		
 		map_ofs = ofs+3-segment0_blkaddr;
 		ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020] = cpu_to_le32(ofs+4);
-		dbg_log("map_ofs = %u \n", map_ofs);
-		dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
+		//dbg_log("map_ofs = %u \n", map_ofs);
+		//dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
 		
 		map_ofs = ofs+4-segment0_blkaddr;
 		ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020] = cpu_to_le32(ofs+5);
-		dbg_log("map_ofs = %u \n", map_ofs);
-		dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
+		//dbg_log("map_ofs = %u \n", map_ofs);
+		//dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
 
 		
 		map_ofs = ofs+5-segment0_blkaddr;
 		ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020] = cpu_to_le32(ofs+6);
-		dbg_log("map_ofs = %u \n", map_ofs);
-		dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
+		//dbg_log("map_ofs = %u \n", map_ofs);
+		//dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
 		
 		map_ofs = ofs+6-segment0_blkaddr;
 		ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020] = cpu_to_le32(ofs+7);
-		dbg_log("map_ofs = %u \n", map_ofs);
-		dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
+		//dbg_log("map_ofs = %u \n", map_ofs);
+		//dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
 		
 		map_ofs = ofs+7-segment0_blkaddr;
 		ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020] = cpu_to_le32(ofs+8);
-		dbg_log("map_ofs = %u \n", map_ofs);
-		dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
+		//dbg_log("map_ofs = %u \n", map_ofs);
+		//dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
 		
 		map_ofs = ofs+512-segment0_blkaddr;
 		ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020] = cpu_to_le32(ofs+9);
-		dbg_log("map_ofs = %u \n", map_ofs);
-		dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
+		//dbg_log("map_ofs = %u \n", map_ofs);
+		//dbg_log("ptr_map_blks[%u].mapping[%u] = %u\n",map_ofs/1020,map_ofs%1020,ptr_map_blks[map_ofs/1020].mapping[map_ofs%1020]);
 
 		//ptr_mapping_table[ofs+2048-segment0_blkaddr] = cpu_to_le32(ofs+0);
 		//ptr_mapping_table[ofs+0-segment0_blkaddr] = cpu_to_le32(ofs+1);
@@ -2397,7 +2449,7 @@ int f2fs_write_snapshot(void)
 	*/
 		
 		struct amf_map_blk * ptr = (ptr_map_blks+loop);
-		dbg_log("ptr->magic = %u,ptr->index = %u \n", ptr->magic,ptr->index, ptr->mapping[0]);
+		dbg_log("ptr->magic = %d,ptr->ver = %d,ptr->index = %d,ptr->mapping[0] = %d \n", ptr->magic,ptr->ver, ptr->index, ptr->mapping[0]);
 		
 		/*
 		struct amf_map_blk* ptrread;

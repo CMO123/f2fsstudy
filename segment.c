@@ -806,7 +806,7 @@ static void locate_dirty_segment(struct f2fs_sb_info *sbi, unsigned int segno)
 	if(valid_blocks == 0){
 		//amf_do_trim(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
 		//f2fs_issue_discard(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
-		tgt_submit_page_erase(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
+		tgt_submit_addr_erase_async(sbi, START_BLOCK(sbi, segno), sbi->blocks_per_seg);
 	}
 #endif
 	

@@ -73,7 +73,7 @@ static void lightpblk_print_geo(struct nvm_geo *geo){
 	
 }
 static int tgt_set_ppaf(struct lightpblk* alightpblk)
-{//用于组织自身逻辑设备的地址
+{//用于组织自身逻辑设备的地址,类型liblightnvm
 	struct nvm_tgt_dev *dev = alightpblk->tgt_dev;
 	struct nvm_geo *geo = &dev->geo;
 	struct nvm_addr_format ppaf = geo->ppaf;
@@ -84,22 +84,24 @@ static int tgt_set_ppaf(struct lightpblk* alightpblk)
 		pr_err("tgt_pblk: supports only power-of-two channel config.\n");
 		return -EINVAL;
 	}
-	ppaf.ch_len = power_len;
+	
 	power_len = get_count_order(geo->nr_luns);
 	if (1 << power_len != geo->nr_luns) {
 		pr_err("tgt_pblk: supports only power-of-two LUN config.\n");
 		return -EINVAL;
 	}
-	ppaf.lun_len = power_len;
-	alightpblk->ppaf.sec_offset = 0;
-	alightpblk->ppaf.pln_offset = ppaf.sect_len;
-	alightpblk->ppaf.ch_offset = alightpblk->ppaf.pln_offset + ppaf.pln_len;
-	alightpblk->ppaf.lun_offset = alightpblk->ppaf.ch_offset + ppaf.ch_len;
-	alightpblk->ppaf.pg_offset = alightpblk->ppaf.lun_offset + ppaf.lun_len;
-	alightpblk->ppaf.blk_offset = alightpblk->ppaf.pg_offset + ppaf.pg_len;
-	alightpblk->ppaf.sec_mask = (1ULL << ppaf.sect_len) - 1;
-	alightpblk->ppaf.pln_mask = ((1ULL << ppaf.pln_len) - 1) <<
-							alightpblk->ppaf.pln_offset;
+	
+	
+	alightpblk->ppaf.sec_offset = ppaf.sect_offset;
+	alightpblk->ppaf.pln_offset = ppaf.pln_offset;
+	alightpblk->ppaf.ch_offset = ppaf.ch_offset;
+	alightpblk->ppaf.lun_offset = ppaf.lun_offset;
+	alightpblk->ppaf.pg_offset = ppaf.pg_offset;
+	alightpblk->ppaf.blk_offset = ppaf.blk_offset;
+
+	
+	alightpblk->ppaf.sec_mask = ((1ULL << ppaf.sect_len) - 1) << ppaf.sect_offset;
+	alightpblk->ppaf.pln_mask = ((1ULL << ppaf.pln_len) - 1) <<	alightpblk->ppaf.pln_offset;
 	alightpblk->ppaf.ch_mask = ((1ULL << ppaf.ch_len) - 1) <<
 							alightpblk->ppaf.ch_offset;
 	alightpblk->ppaf.lun_mask = ((1ULL << ppaf.lun_len) - 1) <<
@@ -110,10 +112,47 @@ static int tgt_set_ppaf(struct lightpblk* alightpblk)
 							alightpblk->ppaf.blk_offset;
 
 	alightpblk->ppaf_bitsize = alightpblk->ppaf.blk_offset + ppaf.blk_len;
+
+	/*pr_notice("ppaf.ch_len = %d, ppaf.lun_len = %d, ppaf.sect_len = %d, ppaf.pln_len = %d, ppaf.pg_len = %d, ppaf.blk_len = %d \n",
+		ppaf.ch_len, ppaf.lun_len, ppaf.sect_len, ppaf.pln_len, ppaf.pg_len, ppaf.blk_len);
+	pr_notice("ppaf.ch_offset = %d, ppaf.lun_offset = %d, ppaf.pln_offset = %d, ppaf.blk_offset = %d, ppaf.pg_offset = %d, ppaf.sect_offset = %d \n",
+		ppaf.ch_offset, ppaf.lun_offset, ppaf.pln_offset, ppaf.blk_offset, ppaf.pg_offset, ppaf.sect_offset);
+	*/
+	/*
+		ppaf.ch_len = 3, ppaf.lun_len = 0, ppaf.sect_len = 0, ppaf.pln_len = 0, ppaf.pg_len = 9, ppaf.blk_len = 10 
+		[  675.646464] ppaf.ch_offset = 19, ppaf.lun_offset = 19, ppaf.pln_offset = 0, ppaf.blk_offset = 9, ppaf.pg_offset = 0, ppaf.sect_offset = 0 
+
+	*/	
+	/*
+	pr_notice("alightpblk->ppaf.sec_mask = 0x%llx,alightpblk->ppaf.pln_mask = 0x%llx,alightpblk->ppaf.ch_mask = 0x%llx, \
+			alightpblk->ppaf.lun_mask = 0x%llx,alightpblk->ppaf.pg_mask = 0x%llx, \
+			alightpblk->ppaf.blk_mask = 0x%llx,alightpblk->ppaf_bitsize = %d \n",
+			alightpblk->ppaf.sec_mask,alightpblk->ppaf.pln_mask,alightpblk->ppaf.ch_mask,
+			alightpblk->ppaf.lun_mask,alightpblk->ppaf.pg_mask,
+			alightpblk->ppaf.blk_mask,alightpblk->ppaf_bitsize);
+	*/
+	/*
+	alightpblk->ppaf.sec_mask = 0x0,alightpblk->ppaf.pln_mask = 0x0,alightpblk->ppaf.ch_mask = 0x7,
+	alightpblk->ppaf.lun_mask = 0x0,alightpblk->ppaf.pg_mask = 0xff8, 
+	alightpblk->ppaf.blk_mask = 0x3ff000,
+	alightpblk->ppaf_bitsize = 22
+	*/
+
+	/*		
 	pr_notice("alightpblk->ppaf.sec_offset = 0x%x\n,alightpblk->ppaf.pln_offset= 0x%x\n, \
 	alightpblk->ppaf.ch_offset= 0x%x\n, alightpblk->ppaf.lun_offset= 0x%x\n,alightpblk->ppaf.pg_offset= 0x%x\n,	\
 	alightpblk->ppaf.blk_offset= 0x%x\n",alightpblk->ppaf.sec_offset,alightpblk->ppaf.pln_offset,
 	alightpblk->ppaf.ch_offset, alightpblk->ppaf.lun_offset,alightpblk->ppaf.pg_offset,	alightpblk->ppaf.blk_offset);
+	*/
+	/*
+	[ 5354.208847] alightpblk->ppaf.sec_offset = 0x0
+	,alightpblk->ppaf.pln_offset= 0x0
+	,	alightpblk->ppaf.ch_offset= 0x0
+	, alightpblk->ppaf.lun_offset= 0x3
+	,alightpblk->ppaf.pg_offset= 0x3
+	,		alightpblk->ppaf.blk_offset= 0xc
+
+	*/
 	
 	return 0;
 }
@@ -173,7 +212,7 @@ static struct lightpblk* lightpblk_fs_create(struct super_block* sb, char* name)
 	int err;
 
 //1. 组件create参数，创建tgt_dev
-	pr_notice(" tgt_bdev->bd_disk->disk_name = %s\n", tgt_bdev->bd_disk->disk_name);//nvme0n1即可
+	//pr_notice(" tgt_bdev->bd_disk->disk_name = %s\n", tgt_bdev->bd_disk->disk_name);//nvme0n1即可
 	
 	strcat(dev_name, tgt_bdev->bd_disk->disk_name);
 	
@@ -221,10 +260,11 @@ static inline void print_ppa(struct ppa_addr *p, char *msg, int error)
 }
 
 
-static inline struct ppa_addr addr_ppa32_to_ppa64(struct pblk *pblk, u32 ppa32)
+static inline struct ppa_addr addr_ppa32_to_ppa64(struct f2fs_sb_info *sbi, u32 ppa32)
 {
-	struct ppa_addr ppa64;
+	struct lightpblk* lightpblk = sbi->s_lightpblk;
 
+	struct ppa_addr ppa64;
 	ppa64.ppa = 0;
 
 	if (ppa32 == -1) {
@@ -233,28 +273,34 @@ static inline struct ppa_addr addr_ppa32_to_ppa64(struct pblk *pblk, u32 ppa32)
 		ppa64.c.line = ppa32 & ((~0U) >> 1);
 		ppa64.c.is_cached = 1;
 	} else {
-		ppa64.g.blk = (ppa32 & light_pblk->ppaf.blk_mask) >>
-							light_pblk->ppaf.blk_offset;
-		ppa64.g.pg = (ppa32 & light_pblk->ppaf.pg_mask) >>
-							light_pblk->ppaf.pg_offset;
-		ppa64.g.lun = (ppa32 & light_pblk->ppaf.lun_mask) >>
-							light_pblk->ppaf.lun_offset;
-		ppa64.g.ch = (ppa32 & light_pblk->ppaf.ch_mask) >>
-							light_pblk->ppaf.ch_offset;
-		ppa64.g.pl = (ppa32 & light_pblk->ppaf.pln_mask) >>
-							light_pblk->ppaf.pln_offset;
-		ppa64.g.sec = (ppa32 & light_pblk->ppaf.sec_mask) >>
-							light_pblk->ppaf.sec_offset;
+		
+		ppa64.g.blk = (ppa32 & lightpblk->ppaf.blk_mask) >>
+							lightpblk->ppaf.blk_offset;
+			
+		ppa64.g.pg = (ppa32 & lightpblk->ppaf.pg_mask) >>
+							lightpblk->ppaf.pg_offset;
+		
+		ppa64.g.lun = (ppa32 & lightpblk->ppaf.lun_mask) >>
+							lightpblk->ppaf.lun_offset;
+		
+		ppa64.g.ch = (ppa32 & lightpblk->ppaf.ch_mask) >>
+							lightpblk->ppaf.ch_offset;
+		
+		ppa64.g.pl = (ppa32 & lightpblk->ppaf.pln_mask) >>
+							lightpblk->ppaf.pln_offset;
+		
+		ppa64.g.sec = (ppa32 & lightpblk->ppaf.sec_mask) >>
+							lightpblk->ppaf.sec_offset;
 	}
-	pr_notice("light_pblk->ppaf.blk_mask = 0x%llx ,light_pblk->ppaf.blk_offset = %d,\nlight_pblk->ppaf.pg_mask = 0x%llx,light_pblk->ppaf.pg_offset = %d,\nlight_pblk->ppaf.lun_mask= 0x%llx, \
-	light_pblk->ppaf.lun_offset = %d,\nlight_pblk->ppaf.ch_mask= 0x%llx,light_pblk->ppaf.ch_offset = %d,\nlight_pblk->ppaf.pln_mask= 0x%llx,light_pblk->ppaf.pln_offset = %d,\n \
-	light_pblk->ppaf.sec_mask= 0x%llx, light_pblk->ppaf.sec_offset = %d\n",light_pblk->ppaf.blk_mask,light_pblk->ppaf.blk_offset,light_pblk->ppaf.pg_mask,
-	light_pblk->ppaf.pg_offset,light_pblk->ppaf.lun_mask,light_pblk->ppaf.lun_offset,light_pblk->ppaf.ch_mask,light_pblk->ppaf.ch_offset,
-	light_pblk->ppaf.pln_mask,light_pblk->ppaf.pln_offset,light_pblk->ppaf.sec_mask,light_pblk->ppaf.sec_offset);
-	
-	pr_notice("ppa64.g.blk = 0x%x ,ppa64.g.pg= 0x%x ,ppa64.g.lun = 0x%x ,ppa64.g.ch = 0x%x ,ppa64.g.pl = 0x%x ,ppa64.g.sec = 0x%x \n",ppa64.g.blk,
+
+	/*pr_notice("ppa64.g.blk = 0x%x ,ppa64.g.pg= 0x%x ,ppa64.g.lun = 0x%x ,ppa64.g.ch = 0x%x ,ppa64.g.pl = 0x%x ,ppa64.g.sec = 0x%x \n",ppa64.g.blk,
 					ppa64.g.pg,ppa64.g.lun,ppa64.g.ch,ppa64.g.pl,ppa64.g.sec);
-		pr_notice("ppa64.ppa = 0x%llx\n",ppa64.ppa);
+	pr_notice("ppa64.ppa = 0x%llx\n",ppa64.ppa);
+	*/
+	/*
+	[ 5354.208884] ppa64.g.blk = 0x0 ,ppa64.g.pg= 0x40 ,ppa64.g.lun = 0x0 ,ppa64.g.ch = 0x0 ,ppa64.g.pl = 0x0 ,ppa64.g.sec = 0x0 
+	[ 5354.208885] ppa64.ppa = 0x400000 
+	*/
 
 	return ppa64;
 }
@@ -285,7 +331,7 @@ static inline int tgt_boundary_ppa_checks(struct nvm_tgt_dev *tgt_dev, struct pp
 	struct nvm_geo *geo = &tgt_dev->geo;
 	struct ppa_addr *ppa;
 	int i;
-	pr_notice("geo->nr_chnls = 0x%x\n", geo->nr_chnls);
+	//pr_notice("geo->nr_chnls = 0x%x\n", geo->nr_chnls);
 	
 		for (i = 0; i < nr_ppas; i++) {
 			ppa = &ppas[i];
@@ -375,8 +421,7 @@ static void tgt_end_io_erase(struct nvm_rq* rqd)
 	
 	struct bio* bio = rqd->bio;
 	pr_notice("=====================Enter tgt_end_io_erase()\n");
-
-	//bio_put(bio);
+	
 	kfree(rqd);
 }
 
@@ -415,7 +460,36 @@ static void tgt_end_io_read(struct nvm_rq* rqd)
 static void bio_map_addr_endio(struct bio* bio){
 	bio_put(bio);
 }
+//==========================================================================
+static int tgt_setup_r_rq(struct f2fs_sb_info *sbi, struct nvm_rq* rqd, int nr_secs, nvm_end_io_fn(*end_io))
+{
+	struct nvm_tgt_dev* tgt_dev = sbi->s_lightpblk->tgt_dev;
+	struct nvm_geo* geo = &tgt_dev->geo;
 
+	/*设置rqd*/
+	rqd->dev = tgt_dev;
+	rqd->opcode = NVM_OP_PREAD;
+	rqd->nr_ppas = nr_secs;
+	rqd->private = sbi;
+	rqd->end_io = end_io;
+	rqd->meta_list = nvm_dev_dma_alloc(tgt_dev->parent, GFP_KERNEL,
+							&rqd->dma_meta_list);	
+	if (!rqd->meta_list) {
+			pr_err("pblk: not able to allocate ppa list\n");
+			return -EFAULT;
+	}
+	if (nr_secs > 1) {
+		rqd->ppa_list = rqd->meta_list + tgt_dma_meta_size;
+		rqd->dma_ppa_list = rqd->dma_meta_list + tgt_dma_meta_size;
+		rqd->flags = NVM_IO_SUSPEND | NVM_IO_SCRAMBLE_ENABLE;	
+		rqd->flags |= geo->plane_mode >> 1;//sequential读
+	}else{
+		rqd->flags = NVM_IO_SUSPEND | NVM_IO_SCRAMBLE_ENABLE;	
+		rqd->flags |= geo->plane_mode >> 1;//sequential读
+	}
+	
+	return 0;
+}
 static int tgt_setup_w_rq(struct f2fs_sb_info* sbi, struct nvm_rq* rqd, int nr_secs, nvm_end_io_fn(*end_io)){
 	struct nvm_tgt_dev* tgt_dev = sbi->s_lightpblk->tgt_dev;
 	struct nvm_geo* geo = &tgt_dev->geo;
@@ -425,7 +499,7 @@ static int tgt_setup_w_rq(struct f2fs_sb_info* sbi, struct nvm_rq* rqd, int nr_s
 	rqd->nr_ppas = nr_secs;
 	rqd->flags = (geo->plane_mode >> 1) | NVM_IO_SCRAMBLE_ENABLE;
 	rqd->private = sbi;
-	rqd->end_io = tgt_end_io_write;
+	rqd->end_io = end_io;
 
 	rqd->meta_list = nvm_dev_dma_alloc(tgt_dev->parent, GFP_KERNEL,
 							&rqd->dma_meta_list);
@@ -443,13 +517,13 @@ static int tgt_setup_w_rq(struct f2fs_sb_info* sbi, struct nvm_rq* rqd, int nr_s
 
 static void tgt_setup_e_rq(struct f2fs_sb_info* sbi, struct nvm_rq* rqd, struct ppa_addr ppa){
 	struct nvm_tgt_dev* tgt_dev = sbi->s_lightpblk->tgt_dev;
-	//struct nvm_geo* geo = &tgt_dev->geo;
+	struct nvm_geo* geo = &tgt_dev->geo;
 	
 	rqd->opcode = NVM_OP_ERASE;
 	rqd->ppa_addr = ppa;
 	rqd->nr_ppas = 1;
-	//rqd->flags = geo->plane_mode >> 1;
-	rqd->flags = 0x1;
+	rqd->flags = geo->plane_mode >> 1;
+	//rqd->flags = 0x1;
 	rqd->bio = NULL;
 	rqd->ppa_list = rqd->meta_list = NULL;
 	rqd->private = sbi;
@@ -457,11 +531,13 @@ static void tgt_setup_e_rq(struct f2fs_sb_info* sbi, struct nvm_rq* rqd, struct 
 	rqd->ppa_status = rqd->error = 0;
 
 }
+//==========================================================================
 
-static int tgt_submit_page_write(struct f2fs_sb_info *sbi, struct page* page, block_t pblkaddr, uint8_t sync)
+static int tgt_submit_page_write_async(struct f2fs_sb_info *sbi, struct page* page, block_t pblkaddr)
 {
 	//struct block_device* bdev = sbi->sb->s_bdev;	
 	struct nvm_tgt_dev* dev = sbi->s_lightpblk->tgt_dev;
+	struct nvm_geo* geo = &dev->geo;
 	struct bio* bio = NULL;
 	unsigned int nr_ppas = 1;
 	int i;
@@ -497,50 +573,202 @@ retry:
 	
 	//rqd->ppa_list[0] = addr_to_gen_ppa(sbi, pblkaddr);
 	rqd->ppa_addr = addr_ppa32_to_ppa64(sbi, pblkaddr);
-	if(sync){
-		ret = nvm_submit_io_sync(dev, rqd);
-	}else{
-		ret = nvm_submit_io(dev, rqd);
+	
+	ret = nvm_submit_io(dev, rqd);
+	if(ret){
+		pr_err("tgt_pblk: nvm_submit_write I/O submission failed: %d\n", ret);
+		bio_put(bio);
 	}
+	return ret;
+}
+
+static int tgt_submit_page_write_sync(struct f2fs_sb_info *sbi, struct page* page, block_t pblkaddr)
+{
+	struct nvm_tgt_dev* dev = sbi->s_lightpblk->tgt_dev;
+	struct nvm_geo* geo = &dev->geo;
+	struct bio* bio = NULL;
+	unsigned int nr_ppas = 1;
+	int i;
+	struct nvm_rq rqd;
+	int ret;
+
+	memset(&rqd, 0, sizeof(struct nvm_rq));
+
+	/*创建bio*/
+	bio = bio_alloc(GFP_KERNEL, nr_ppas);
+	if(!bio)
+		return -ENOMEM;	
+	bio->bi_iter.bi_sector = 0; /* internal bio */
+	bio->bi_end_io = bio_map_addr_endio;
+	//bio->bi_private = sbi;
+	bio_set_op_attrs(bio, REQ_OP_WRITE, 0);	
+
+	if(bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE)
+	{
+		pr_err("tgt_pblk: Error occur while calling tgt_submit_write");
+		bio_put(bio);
+		return -EFAULT;
+	}
+
+retry:	
+	/*创建rqd*/
+	rqd.bio = bio;	
+	ret = tgt_setup_w_rq(sbi, &rqd, nr_ppas,NULL);
+	rqd.ppa_addr = addr_ppa32_to_ppa64(sbi, pblkaddr);
+	
+	ret = nvm_submit_io_sync(dev, &rqd);
 	if(ret){
 		pr_err("tgt_pblk: nvm_submit_write I/O submission failed: %d\n", ret);
 		bio_put(bio);
 		goto free_rqd_dma;
 	}
-	
+	//可以添加特定的end_io()
 free_rqd_dma:
-	nvm_dev_dma_free(dev->parent, rqd->meta_list, rqd->dma_meta_list);
+	nvm_dev_dma_free(dev->parent, rqd.meta_list, rqd.dma_meta_list);
+	return ret;
+}
+
+//tgt的write函数
+static int tgt_submit_page_write(struct f2fs_sb_info *sbi, struct page* page, block_t pblkaddr, int sync){
+	if(sync){
+		return tgt_submit_page_write_sync(sbi, page, pblkaddr);
+	}else{
+		return tgt_submit_page_write_async(sbi, page, pblkaddr);
+	}
+
+}
+
+
+static int tgt_submit_page_erase_async(struct f2fs_sb_info *sbi, struct ppa_addr paddr){
+		struct nvm_tgt_dev* dev = sbi->s_lightpblk->tgt_dev;
+		struct nvm_rq* rqd;
+		int err;
+
+		rqd = kzalloc(sizeof(struct nvm_rq),GFP_KERNEL);
+
+		tgt_setup_e_rq(sbi, rqd, paddr);		
+		rqd->end_io = tgt_end_io_erase;
+		rqd->private = rqd;//传入end_io
+		
+		pr_notice("tgt_submit_erase(): ppa = 0x%llx\n", paddr.ppa);
+	
+		if(tgt_boundary_ppa_checks(dev, &paddr, 1)){
+			pr_notice("tgt: tgt_boundary_ppa_checks_error()\n");
+		}		
+		
+		err =  nvm_submit_io(dev, rqd);
+		if(err){
+			pr_notice("tgt: tgt_submit_page_erase_async() error\n");
+		}
+		return err;
+		
+}
+
+static int tgt_submit_page_erase_sync(struct f2fs_sb_info *sbi, struct ppa_addr paddr){
+	struct nvm_tgt_dev* dev = sbi->s_lightpblk->tgt_dev;
+	struct nvm_rq rqd;
+	int ret = 0;
+
+	memset(&rqd, 0, sizeof(struct nvm_rq));
+	tgt_setup_e_rq(sbi, &rqd, paddr);
+
+	
+	if(tgt_boundary_ppa_checks(dev, &paddr, 1)){
+		pr_notice("tgt: tgt_boundary_ppa_checks_error()\n");
+	}
+	
+	pr_notice("tgt_submit_erase(): ppa = 0x%llx\n", paddr.ppa);
+		
+	ret = nvm_submit_io_sync(dev, &rqd);
+	if(ret){
+		pr_notice("tgt: tgt_submit_page_erase_sync() error\n");
+		rqd.error = ret;
+	}
+	rqd.private = sbi;
+	//可以添加特定的rqd的__pblk_end_io_erase();
+	return ret;
+}
+
+
+//erase的提交函数
+static int tgt_submit_addr_erase_async(struct f2fs_sb_info* sbi, block_t paddr, uint32_t nr_blks){
+	struct nvm_tgt_dev* dev = sbi->s_lightpblk->tgt_dev;
+	int erase_num = 1;
+	int pg_per_sec = sbi->segs_per_sec * (1 << sbi->log_blocks_per_seg);
+	int i;
+	int ret;
+
+	if(nr_blks == pg_per_sec){//每次擦除一个section，512对应设备一个line中的4个blk
+		erase_num = 4;
+		pr_notice("erase 4 blk\n");
+	}
+	
+	//有一个大问题，就是数据的组织，segment的粒度，烦，先暂时按一个ppa一个ppa地擦除
+	for(i = 0; i < erase_num; i++){
+		struct ppa_addr  ppa = addr_ppa32_to_ppa64(sbi, paddr+i);
+
+		ppa.g.pg = 0;
+		ppa.g.pl = 0;
+		ppa.g.sec = 0;
+		
+		pr_notice("tgt_submit_erase(): ppa = 0x%llx\n", ppa.ppa);
+		if(tgt_boundary_ppa_checks(dev, &ppa, 1)){
+				pr_notice("tgt_boundary_ppa_checks_error()\n");
+		}
+		ret = tgt_submit_page_erase_async(sbi, ppa);
+		if(ret){
+			pr_notice("tgt: tgt_submit_addr_erase_async() error\n");
+		}
+	}
+	
+	return ret;
+}
+
+
+static int tgt_submit_page_read_sync(struct f2fs_sb_info *sbi, struct page* page, block_t paddr)
+{
+	struct nvm_tgt_dev *dev = sbi->s_lightpblk->tgt_dev;
+	struct block_device* bdev = sbi->sb->s_bdev;
+	struct nvm_geo* geo = &dev->geo;
+	struct nvm_rq rqd;
+	struct bio* bio = NULL;
+	unsigned int nr_secs = 1;
+	int ret = 0;
+
+	memset(&rqd, 0, sizeof(struct nvm_rq));
+	
+	/*创建一个bio*/
+	bio = bio_alloc(GFP_KERNEL, 1);	
+	bio_set_dev(bio, bdev);
+	bio->bi_iter.bi_sector = 0;
+	bio->bi_end_io = bio_map_addr_endio;
+	bio_set_op_attrs(bio, REQ_OP_READ, 0);
+	if (bio_add_page (bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
+		pr_err("Error occur while calling risa_readpage");
+		bio_put (bio);
+		return -EFAULT;
+	}
+
+	rqd.bio = bio;
+	ret = tgt_setup_r_rq(sbi, &rqd, 1, NULL);
+	rqd.ppa_addr = addr_ppa32_to_ppa64(sbi, paddr);
+
+	
+	ret = nvm_submit_io_sync(dev, &rqd);
+	if(ret){
+		pr_err("tgt_pblk: emeta I/O submission failed: %d\n", ret);
+		bio_put(bio);
+		goto free_rqd_dma;
+		
+	}
+free_rqd_dma:
+	nvm_dev_dma_free(dev->parent, rqd.meta_list, rqd.dma_meta_list);
 	return ret;
 }
 
 
 
-
-static int tgt_submit_page_erase(struct f2fs_sb_info *sbi, block_t paddr, uint32_t nr_blks){
-	struct nvm_tgt_dev* dev = sbi->s_lightpblk->tgt_dev;
-	struct nvm_rq* rqd;
-	struct ppa_addr ppa = addr_ppa32_to_ppa64(sbi, paddr);
-
-	
-	pr_notice("tgt_submit_erase(): ppa = 0x%llx\n", ppa.ppa);
-	pr_notice("ppa->g.ch = 0x%x\n",ppa.g.ch);
-
-	if(tgt_boundary_ppa_checks(dev, &ppa, 1)){
-		pr_notice("tgt_boundary_ppa_checks_error()\n");
-	}
-	
-	rqd = kzalloc(sizeof(struct nvm_rq),GFP_KERNEL);
-	
-	tgt_setup_e_rq(sbi, rqd, ppa);
-	rqd->end_io = tgt_end_io_erase;
-	
-	
-	nvm_submit_io(dev, rqd);
-	
-	return 0;
-}
-
-static int tgt_submit_page_read(struct f2fs_sb_info *sbi, struct page* page, block_t paddr)
+static int tgt_submit_page_read_async(struct f2fs_sb_info *sbi, struct page* page, block_t paddr)
 {
 	struct nvm_tgt_dev *dev = sbi->s_lightpblk->tgt_dev;
 	struct block_device* bdev = sbi->sb->s_bdev;
@@ -548,17 +776,18 @@ static int tgt_submit_page_read(struct f2fs_sb_info *sbi, struct page* page, blo
 	struct nvm_rq *rqd;
 	struct bio* bio = NULL;
 	unsigned int nr_secs = 1;
-	int j =0;
+	int ret =0, j = 0;
 	
-pr_notice("Enter tgt_submit_page_read()\n");
-pr_notice("read paddr = %d\n", paddr);
+
+//pr_notice("read paddr = %d\n", paddr);
+	
 	/*创建一个bio*/
 	bio = bio_alloc(GFP_KERNEL, 1);
 	
 	bio_set_dev(bio, bdev);
 	//bio->bi_iter.bi_sector = SECTOR_FROM_BLOCK(paddr);//根据blk_addr计算sector地址
 	bio->bi_iter.bi_sector = 0;
-	//bio->bi_end_io = f2fs_read_end_io2;
+	bio->bi_end_io = bio_map_addr_endio;
 	bio->bi_private = sbi;	
 	bio_set_op_attrs(bio, REQ_OP_READ, 0);
 	if (bio_add_page (bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
@@ -566,42 +795,25 @@ pr_notice("read paddr = %d\n", paddr);
 		bio_put (bio);
 		return -EFAULT;
 	}
-	
+
 
 	/*设置rqd*/
 	rqd = kzalloc(sizeof(struct nvm_rq), GFP_KERNEL);
-	rqd->dev = dev;
-	rqd->opcode = NVM_OP_PREAD;
 	rqd->bio = bio;
-	rqd->nr_ppas = nr_secs;
-	rqd->private = sbi;
-	rqd->end_io = tgt_end_io_read;
-	rqd->meta_list = nvm_dev_dma_alloc(dev->parent, GFP_KERNEL,
-							&rqd->dma_meta_list);	
-	if (!rqd->meta_list) {
-			pr_err("pblk: not able to allocate ppa list\n");
-			return -EFAULT;
-	}
-	
+	ret = tgt_setup_r_rq(sbi, rqd, 1, tgt_end_io_read);
+
 	if (nr_secs > 1) {
-		rqd->ppa_list = rqd->meta_list + tgt_dma_meta_size;
-		rqd->dma_ppa_list = rqd->dma_meta_list + tgt_dma_meta_size;
 		rqd->ppa_list[j++] = addr_ppa32_to_ppa64(sbi, paddr);
-		pr_notice("rqd->ppa_list[j-1] = 0x%llx\n",rqd->ppa_list[j-1]);
-		
-		pr_notice("nr_secs > 1 \n");
-		rqd->flags = NVM_IO_SUSPEND | NVM_IO_SCRAMBLE_ENABLE;	
-		rqd->flags |= geo->plane_mode >> 1;//sequential读
 	}else{
 		rqd->ppa_addr = addr_ppa32_to_ppa64(sbi, paddr);
-		pr_notice("rqd->ppa_addr = 0x%llx\n",rqd->ppa_addr);
-		rqd->flags = NVM_IO_SUSPEND | NVM_IO_SCRAMBLE_ENABLE;	
 	}
 	
-
-	bio_get(bio);
-	
-	return nvm_submit_io(dev, rqd);
+	ret =  nvm_submit_io(dev, rqd);
+	if(ret){
+		pr_err("tgt: tgt_submit_page_read_async() error, ret = %d\n", ret);
+		bio_put(bio);		
+	}
+	return ret;
 }
 /*
 int tgt_submit_io_sync(struct f2fs_sb_info* sbi, struct page* page, block_t paddr, int dir){

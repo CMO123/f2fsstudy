@@ -2712,23 +2712,23 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		pr_notice("tgt_dev的geo.nr_luns = 0x%x\n",a->geo.nr_luns);
 		pr_notice("tgt_dev的geo.all_luns = 0x%x\n",a->geo.all_luns);
 		int aret;
-		/*aret = tgt_submit_page_erase(sbi, 512,1);
 		
-		mdelay(1000);
+		aret = tgt_submit_addr_erase_async(sbi, 545, 1);
+		mdelay(10000);
+		
 		struct page* apage = alloc_page(GFP_NOFS | __GFP_ZERO);
 		uint8_t* ptr_page_addr = (uint8_t*)page_address(apage);
 		memset(ptr_page_addr,6,PAGE_SIZE);
-		pr_notice("ptr_page_addr1 = %d\n",*ptr_page_addr);
+		pr_notice("ptr_page_addr1 = %d\n",*ptr_page_addr);		
+		aret = tgt_submit_page_write(sbi, apage,545,0);
+		mdelay(10000);		
 		
-		aret = tgt_submit_page_write(sbi, apage,512,0);
-		mdelay(10000);
-		*/
 		struct page* bpage = alloc_page(GFP_NOFS | __GFP_ZERO);
 		//struct amf_map_blk* ptr_page_addr2 = (struct amf_map_blk*)page_address(bpage);
-		char* ptr_page_addr2 = (char*)page_address(bpage);
-		aret = tgt_submit_page_read(sbi, bpage, 500*8);
-		mdelay(1000);
-		pr_notice("ptr_page_addr2 = %s\n",ptr_page_addr2);
+		uint8_t* ptr_page_addr2 = (uint8_t*)page_address(bpage);
+		aret = tgt_submit_page_read_async(sbi, bpage, 545);
+		mdelay(10000);
+		pr_notice("ptr_page_addr2 = %d\n",*ptr_page_addr2);
 		//pr_notice("ptr_page_addr2->magic = %u, ptr_page_addr2->index = %u, ptr_page_addr2->mapping[0]=%u\n", ptr_page_addr2->magic, ptr_page_addr2->index, ptr_page_addr2->mapping[0]);
 		mdelay(20000);
 		
