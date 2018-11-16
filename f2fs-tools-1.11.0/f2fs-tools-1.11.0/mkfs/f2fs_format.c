@@ -233,6 +233,7 @@ static int f2fs_prepare_super_block(void)
 #ifdef AMF_SNAPSHOT
 		u_int32_t nr_meta_logging_segments = 0;
 		u_int32_t nr_meta_logging_blks = 0;
+		u_int64_t zone_align_start_offset2;
 #endif
 
 
@@ -309,7 +310,9 @@ static int f2fs_prepare_super_block(void)
 			return -1;
 	}
 
-	set_sb(segment0_blkaddr, zone_align_start_offset / blk_size_bytes);// 2048
+
+	set_sb(segment0_blkaddr, zone_align_start_offset / blk_size_bytes);
+
 	sb->cp_blkaddr = sb->segment0_blkaddr;
 
 	MSG(0, "Info: zone aligned segment0 blkaddr: %u\n",

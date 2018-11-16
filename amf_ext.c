@@ -138,13 +138,14 @@ int8_t amf_writepage (struct f2fs_sb_info* sbi, struct page* page, block_t pblka
 }
 
 
-static int8_t build_dram_metalog (
-	struct f2fs_sb_info* sbi)
+static int8_t build_dram_metalog (struct f2fs_sb_info* sbi)
 {
 	struct amf_info* ri = AMF_RI (sbi);
 	struct page* page = NULL;
 	uint32_t blkofs = 0;
 	int8_t ret = 0;
+
+
 
 	/* get the free page from the memory pool */
 	page = alloc_page (GFP_NOFS | __GFP_ZERO);
@@ -193,6 +194,7 @@ static int8_t create_dram_metalog (
 	struct amf_info* ri = AMF_RI (sbi);
 	uint32_t metalog_size_in_byte;
 
+
 	/* get the size of memory space for metalog */
 	metalog_size_in_byte = ri->nr_metalog_phys_blks * F2FS_BLKSIZE;
 
@@ -215,7 +217,7 @@ static int32_t create_metalog_summary_table (struct f2fs_sb_info* sbi)
 	uint32_t i = 0, j = 0;
 	uint8_t is_dead = 1;
 	int32_t ret = 0;
-pr_notice("Enter create_metalog_summary_table()\n");
+//pr_notice("Enter create_metalog_summary_table()\n");
 	/* get the geometry information */
 	sum_length = (sizeof (uint8_t) * ri->nr_metalog_phys_blks + F2FS_BLKSIZE - 1) / F2FS_BLKSIZE;//需要几个block？
 
@@ -246,7 +248,7 @@ pr_notice("Enter create_metalog_summary_table()\n");
 		}
 	}
 
-	/* search for a section that contains only invalid blks */
+	/* search for a section that contains only invalid blks,只找一个即可 */
 	for (i = 0; i < ri->nr_metalog_phys_blks / ri->blks_per_sec; i++) {
 		is_dead = 1;
 		for (j = 0; j < ri->blks_per_sec; j++) {
@@ -262,6 +264,7 @@ pr_notice("Enter create_metalog_summary_table()\n");
 
 			//risa_do_trim (sbi, ri->mapping_blkofs + ri->metalog_gc_eblkofs, ri->blks_per_sec); 
 			ret = tgt_submit_addr_erase_async(sbi, ri->mapping_blkofs + ri->metalog_gc_eblkofs, ri->blks_per_sec);
+			//mdelay(10000);
 			//f2fs_issue_discard(sbi, ri->mapping_blkofs + ri->metalog_gc_eblkofs, ri->blks_per_sec);
 			memset (&ri->summary_table[i*ri->blks_per_sec], 0x00, ri->blks_per_sec);
 			break;
@@ -281,7 +284,8 @@ pr_notice("Enter create_metalog_summary_table()\n");
 		amf_msg ("-------------------------------");
 	}
 
-	pr_notice("End create_metalog_summary()\n");
+	//pr_notice("End create_metalog_summary()\n");
+	//mdelay(20000);
 out:
 	return ret;
 }
@@ -298,7 +302,7 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 	uint32_t i = 0, j = 0;
 	uint8_t is_dead_section = 1;
 	int32_t ret = 0;
-pr_notice("Enter create_metalog_mapping_table()\n");
+//pr_notice("Enter create_metalog_mapping_table()\n");
 	/* get the geometry information */
 	ri->nr_mapping_phys_blks = NR_MAPPING_SECS * ri->blks_per_sec;
 	ri->nr_mapping_logi_blks = ri->nr_metalog_logi_blks / 1020;//metalog逻辑blk数目/1020，即metalog需要多少个blk来映射metalog数据地址
@@ -395,10 +399,11 @@ pr_notice("Enter create_metalog_mapping_table()\n");
 				//amf_do_trim (sbi, ri->mapping_blkofs + ri->mapping_gc_eblkofs, ri->blks_per_sec); 
 				//f2fs_issue_discard(sbi, ri->mapping_blkofs + ri->mapping_gc_eblkofs, ri->blks_per_sec);
 				tgt_submit_addr_erase_async(sbi, ri->mapping_blkofs + ri->mapping_gc_eblkofs, ri->blks_per_sec);
-				
+				//mdelay(10000);
 				
 			}
 		}
+		//mdelay(10000);
 	}
 
 	/* is there a free section for the mapping table? */
@@ -423,8 +428,9 @@ out:
 	/* unlock & free the page */
 	unlock_page (page);
 	__free_pages (page, 0);
-
-	pr_notice("create_metalog_mapping is ok!\n");
+	
+	//pr_notice("create_metalog_mapping is ok!\n");
+	//mdelay(20000);
 	return ret;
 }
 
@@ -486,7 +492,7 @@ pr_notice("Exit amf_create_ri()\n");
 
 int32_t amf_build_ri (struct f2fs_sb_info *sbi)
 {
-pr_notice("Enter amf_build_ri()\n");
+//pr_notice("Enter amf_build_ri()\n");
 	/* see if ri is initialized or not */
 	if (sbi == NULL || sbi->ri == NULL) {
 		amf_dbg_msg ("Error occur because some input parameters are NULL");
@@ -504,18 +510,20 @@ pr_notice("Enter amf_build_ri()\n");
 		amf_dbg_msg ("Errors occur while creating the metalog summary table");
 		goto error_metalog_summary;
 	}
-	mdelay(10000);
+	//mdelay(20000);
 #ifdef AMF_DRAM_META_LOGGING
 	if (create_dram_metalog (sbi) != 0) {
 		amf_dbg_msg ("Errors occur while creating the dram metalog");
 		goto error_create_dram_metalog;
 	}
-
+	
 	if (build_dram_metalog (sbi) != 0) {
 		amf_dbg_msg ("Errors occur while building the dram metalog");
 		goto error_build_dram_metalog;
 	}
+	
 #endif
+amf_dbg_msg("End amf_build_ri()\n");
 
 	return 0;
 
@@ -554,7 +562,8 @@ int32_t get_mapping_free_blks (struct f2fs_sb_info* sbi)
 			ri->mapping_gc_sblkofs, ri->mapping_gc_eblkofs);
 		nr_free_blks = -1;
 	}
-
+	
+pr_notice("get_mapping_free_blks() return nr_free_blks = %d\n", nr_free_blks);
 	return nr_free_blks;
 }
 
@@ -570,7 +579,7 @@ int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 {
 	struct amf_info* ri = AMF_RI (sbi);
 
-	/*
+	
 	amf_dbg_msg ("before gc");
 	amf_msg ("-------------------------------");
 	amf_msg ("ri->mapping_gc_slbkofs: %u (%u)", 
@@ -578,7 +587,7 @@ int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 	amf_msg ("ri->mapping_gc_eblkofs: %u (%u)", 
 		ri->mapping_gc_eblkofs, ri->mapping_blkofs + ri->mapping_gc_eblkofs);
 	amf_msg ("-------------------------------");
-	*/
+	
 
 	/* perform gc */
 	//risa_do_trim (sbi, ri->mapping_blkofs + ri->mapping_gc_sblkofs, ri->blks_per_sec); 
@@ -588,7 +597,7 @@ int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 	ri->mapping_gc_sblkofs = (ri->mapping_gc_sblkofs + ri->blks_per_sec) % 
 		ri->nr_mapping_phys_blks;
 
-	/*
+	
 	amf_dbg_msg ("after gc");
 	amf_msg ("-------------------------------");
 	amf_msg ("ri->mapping_gc_slbkofs: %u (%u)", 
@@ -596,7 +605,7 @@ int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 	amf_msg ("ri->mapping_gc_eblkofs: %u (%u)", 
 		ri->mapping_gc_eblkofs, ri->mapping_blkofs + ri->mapping_gc_eblkofs);
 	amf_msg ("-------------------------------");
-	*/
+	
 
 	return 0;
 }
@@ -610,7 +619,7 @@ int32_t amf_write_mapping_entries (struct f2fs_sb_info* sbi)
 	uint32_t i = 0;
 
 	/* see if gc is needed for the mapping area */
-	nr_free_blks = get_mapping_free_blks (sbi);
+	nr_free_blks = get_mapping_free_blks (sbi);//512
 	if (is_mapping_gc_needed (sbi, nr_free_blks) == 0) {
 		amf_do_mapping_gc (sbi);
 	}
@@ -647,7 +656,8 @@ int32_t amf_write_mapping_entries (struct f2fs_sb_info* sbi)
 		/*ri->map_blks[i].index, ri->mapping_blkofs + ri->mapping_gc_eblkofs);*/
 		/*risa_writepage_flash (sbi, page, ri->mapping_blkofs + ri->mapping_gc_eblkofs, 1);*/
 		//risa_writepage_flash (sbi, page, ri->mapping_blkofs + ri->mapping_gc_eblkofs, 0);
-		write_meta_page(sbi, page,FS_META_IO);
+		//write_meta_page(sbi, page,FS_META_IO);
+		tgt_submit_page_write_async(sbi, page, ri->mapping_blkofs + ri->mapping_gc_eblkofs);
 
 		/* update physical location */
 		ri->mapping_gc_eblkofs = 
@@ -655,6 +665,7 @@ int32_t amf_write_mapping_entries (struct f2fs_sb_info* sbi)
 
 		atomic64_add (1, &sbi->pmu.mapping_w);
 	}
+pr_notice("end amf_write_mapping_entires()\n");
 
 	return 0;
 }
@@ -799,9 +810,12 @@ int8_t amf_map_l2p (struct f2fs_sb_info* sbi, block_t lblkaddr, block_t pblkaddr
 			/*if (amf_do_trim (sbi, prev_pblkaddr, 1) == -1) {
 				amf_dbg_msg (KERN_INFO "Errors occur while trimming the page during risa_map_l2p");
 			}*/
+
+			/*
 			if (tgt_submit_addr_erase_async(sbi, prev_pblkaddr, 1) == -1) {
 				amf_dbg_msg (KERN_INFO "Errors occur while trimming the page during risa_map_l2p");
 			}
+			*/
 		} else if (prev_pblkaddr != NULL_ADDR) {
 			amf_dbg_msg ("invalid prev_pblkaddr = %llu", (int64_t)prev_pblkaddr);
 		} else {
@@ -816,7 +830,7 @@ int8_t amf_map_l2p (struct f2fs_sb_info* sbi, block_t lblkaddr, block_t pblkaddr
 		ri->summary_table[cur_pblkaddr - ri->metalog_blkofs] = 1; /* set to valid */
 
 		/* adjust end_blkofs in the meta-log */
-		ri->metalog_gc_eblkofs = (ri->metalog_gc_eblkofs + 1) % (ri->nr_metalog_phys_blks);
+		ri->metalog_gc_eblkofs = (ri->metalog_gc_eblkofs + 1) % (ri->nr_metalog_phys_blks);//分配了一个新的paddr
 
 		/* go to the next logical blkaddr */
 		cur_lblkaddr++;
@@ -1001,7 +1015,7 @@ void amf_submit_bio_meta_r (struct f2fs_sb_info* sbi, struct bio* bio)
 	uint8_t* dst_page_addr = NULL;
 	struct bvec_iter bioloop;
 	int8_t ret = 0;
-
+pr_notice("Enter amf_submit_bio_meta_r()\n");
 	src_page = alloc_page (GFP_NOFS | __GFP_ZERO);
 	if (IS_ERR (src_page)) {
 		amf_dbg_msg ("Errors occur while allocating page");
@@ -1031,6 +1045,7 @@ void amf_submit_bio_meta_r (struct f2fs_sb_info* sbi, struct bio* bio)
 			ret = -1;
 			goto out;
 		}
+pr_notice("lblkaddr = %d ==> pblkaddr = %d\n", lblkaddr, pblkaddr);
 
 		/* read the requested page */
 		if (tgt_submit_page_read_sync(sbi, src_page, pblkaddr) != 0) {
@@ -1052,6 +1067,7 @@ out:
 	/* unlock & free the page */
 	unlock_page (src_page);
 	__free_pages (src_page, 0);
+pr_notice("End amf_submit_bio_meta_r()\n");
 
 	if (ret == 0) {
 		//bio_clear_flag(bio, BIO_TRACE_COMPLETION);		
@@ -1067,14 +1083,15 @@ void amf_submit_bio (struct f2fs_sb_info* sbi, struct bio * bio, enum page_type 
 	block_t lblkaddr = amf_get_lba(bio) ;
 
 	if (amf_is_cp_blk (sbi, lblkaddr)) {
-			amf_write_mapping_entries (sbi);
+amf_dbg_msg("lblkaddr = %d enter amf_is_cp_blk()\n", lblkaddr);
+		amf_write_mapping_entries (sbi);
 #ifdef AMF_PMU
 			atomic64_inc (&sbi->pmu.ckp_w);
 #endif
 	}
 
 	if (is_valid_meta_lblkaddr (sbi, lblkaddr) == 0) {
-
+		pr_notice("is_valid_meta_lblkaddr() is true\n");
 		if (op_is_write(bio_op(bio))) {//write
 #ifdef AMF_PMU
 			atomic64_add(bio_sectors (bio) / 8, &sbi->pmu.meta_w);
@@ -1248,7 +1265,7 @@ int8_t amf_do_trim (struct f2fs_sb_info* sbi, block_t pblkaddr, uint32_t nr_blks
 	return -1;
 }
 
-int8_t amf_do_gc (struct f2fs_sb_info* sbi)
+int8_t amf_do_gc (struct f2fs_sb_info* sbi)//应该是metalog的gc
 {
 	struct amf_info* ri = AMF_RI (sbi);
 	struct page* page = NULL;
@@ -1273,7 +1290,7 @@ int8_t amf_do_gc (struct f2fs_sb_info* sbi)
 	}
 
 	/* read all valid blks in the victim segment */
-	for (cur_blkofs = ri->metalog_gc_sblkofs; 
+	for (cur_blkofs = ri->metalog_gc_sblkofs;
 		 cur_blkofs < ri->metalog_gc_sblkofs + (sbi->segs_per_sec * sbi->blocks_per_seg); 
 		 cur_blkofs++) 
 	{
@@ -1291,9 +1308,10 @@ int8_t amf_do_gc (struct f2fs_sb_info* sbi)
 			/*if (f2fs_issue_discard (sbi, ri->metalog_blkofs + cur_blkofs, 1) == -1) {
 				amf_dbg_msg (KERN_INFO "Errors occur while trimming the page during GC");
 			}*/
-			if (tgt_submit_addr_erase_async(sbi, ri->metalog_blkofs + cur_blkofs, 1) == -1) {
+
+			/*if (tgt_submit_addr_erase_async(sbi, ri->metalog_blkofs + cur_blkofs, 1) == -1) {
 				amf_dbg_msg (KERN_INFO "Errors occur while trimming the page during GC");
-			}
+			}*/
 			continue;
 		}
 
@@ -1327,11 +1345,14 @@ int8_t amf_do_gc (struct f2fs_sb_info* sbi)
 			printk (KERN_INFO "[ERROR] errors occur while trimming the page during GC");
 			continue;
 		}*/
-		if (tgt_submit_addr_erase_async (sbi, src_pblkaddr, 1) == -1) {
+
+		/*if (tgt_submit_addr_erase_async (sbi, src_pblkaddr, 1) == -1) {
 			printk (KERN_INFO "[ERROR] errors occur while trimming the page during GC");
 			continue;
 		}
+		*/
 
+		
 		/* update mapping table */
 		for (loop = 0; loop < ri->nr_metalog_logi_blks; loop++) {
 			if (ri->map_blks[loop/1020].mapping[loop%1020] == src_pblkaddr) {
@@ -1357,7 +1378,10 @@ int8_t amf_do_gc (struct f2fs_sb_info* sbi)
 		atomic64_add (1, &sbi->pmu.metalog_gc_rw);
 #endif
 	}
-
+	/*trim 整个segment*/
+	if (tgt_submit_addr_erase_async (sbi, ri->metalog_gc_sblkofs, sbi->segs_per_sec * sbi->blocks_per_seg) == -1) {
+		printk (KERN_INFO "[ERROR] errors occur while trimming the page during GC");
+	}
 	/* update start offset */
 	ri->metalog_gc_sblkofs = 
 		(ri->metalog_gc_sblkofs + (sbi->segs_per_sec * sbi->blocks_per_seg)) % 

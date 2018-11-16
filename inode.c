@@ -205,6 +205,9 @@ pr_notice("Enter do_read_inode()， inode->i_ino = 0x%lx\n",inode->i_ino);
 		return -EINVAL;
 	}
 
+	pr_notice("before mdelay4\n");
+	mdelay(10000);
+
 	node_page = get_node_page(sbi, inode->i_ino);
 	if (IS_ERR(node_page))
 		return PTR_ERR(node_page);
@@ -316,6 +319,9 @@ pr_notice("inode is newly create?? inode->i_state & I_NEW =0x%lx\n",inode->i_sta
 		trace_f2fs_iget(inode);
 		return inode;	//返回找到的已经存在的inode
 	}
+	amf_dbg_msg("before mdelay4\n");
+	mdelay(10000);
+	
 	////////////////////////////新建的inode////////////////////////////////////////////////////////////////
 	if (ino == F2FS_NODE_INO(sbi) || ino == F2FS_META_INO(sbi)) // ino == 1或2
 		goto make_now;

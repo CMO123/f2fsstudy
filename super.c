@@ -2697,17 +2697,14 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 			goto free_sb_buf;
 		}
 		
-		/*
+		
 		if(amf_build_ri(sbi) !=0){
 			f2fs_msg (sb, KERN_ERR, "Failed to build amf information");
 			goto free_sb_buf;
 		}
-		*/
-	
-	
-		
+				
 			//修改core.c中nvm_create_tgt()
-		
+		/*
 		struct nvm_tgt_dev * a = sbi->s_lightpblk->tgt_dev;
 		pr_notice("tgt_dev的geo.nr_luns = 0x%x\n",a->geo.nr_luns);
 		pr_notice("tgt_dev的geo.all_luns = 0x%x\n",a->geo.all_luns);
@@ -2720,24 +2717,24 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		uint8_t* ptr_page_addr = (uint8_t*)page_address(apage);
 		memset(ptr_page_addr,6,PAGE_SIZE);
 		pr_notice("ptr_page_addr1 = %d\n",*ptr_page_addr);		
-		aret = tgt_submit_page_write(sbi, apage,545,0);
-		mdelay(10000);		
+		aret = tgt_submit_page_write(sbi, apage,545,1);
+		//mdelay(10000);		
 		
 		struct page* bpage = alloc_page(GFP_NOFS | __GFP_ZERO);
 		//struct amf_map_blk* ptr_page_addr2 = (struct amf_map_blk*)page_address(bpage);
 		uint8_t* ptr_page_addr2 = (uint8_t*)page_address(bpage);
-		aret = tgt_submit_page_read_async(sbi, bpage, 545);
-		mdelay(10000);
+		aret = tgt_submit_page_read_sync(sbi, bpage, 545);
+		//mdelay(10000);
 		pr_notice("ptr_page_addr2 = %d\n",*ptr_page_addr2);
 		//pr_notice("ptr_page_addr2->magic = %u, ptr_page_addr2->index = %u, ptr_page_addr2->mapping[0]=%u\n", ptr_page_addr2->magic, ptr_page_addr2->index, ptr_page_addr2->mapping[0]);
 		mdelay(20000);
-		
+		*/
 #endif	
 	
 
 
 //===================================================================================//
-
+	
 	err = init_percpu_info(sbi);
 	if (err)
 		goto free_bio_info;
@@ -2750,7 +2747,8 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 			goto free_percpu;
 		}
 	}
-
+	
+	
 	/* get an inode for meta space */
 	// 为meta空间获得一个inode
 	sbi->meta_inode = f2fs_iget(sb, F2FS_META_INO(sbi));//F2FS_META_INO = 0x2; sbi->meta_inode->i_ino = 0x2;
@@ -2759,6 +2757,15 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		err = PTR_ERR(sbi->meta_inode);
 		goto free_io_dummy;
 	}
+	/*struct ppa_addr appa1 = addr_ppa32_to_ppa64(sbi, 512);
+	pr_notice("appa1.ppa = 0x%llx, appa1.g.ch =%d, appa1.g.blk =%d, appa1.g.lun =%d, \
+			appa1.g.pg = %d, appa1.g.sec =%d, appa1.g.pl=%d\n", 
+			appa1.ppa, appa1.g.ch, appa1.g.blk, appa1.g.lun, appa1.g.pg, appa1.g.sec, appa1.g.pl);
+	struct ppa_addr appa2 = addr_ppa32_to_ppa64(sbi, 513);
+	pr_notice("appa2.ppa = 0x%llx, appa2.g.ch =%d, appa2.g.blk =%d, appa2.g.lun =%d, \
+			appa2.g.pg = %d, appa2.g.sec = %d, appa2.g.pl = %d\n", 
+			appa2.ppa, appa2.g.ch, appa2.g.blk, appa2.g.lun, appa2.g.pg, appa2.g.sec, appa2.g.pl);
+	*/
 	
 
 	//根据sbi信息，得到checkpoint起始地址，读取checkpoint放入sbi->ckpt中。
@@ -2768,11 +2775,8 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		goto free_meta_inode;
 	}
 
-	
-	
-
 	/* Initialize device list */
-	//初始化设备链表，从raw_super.devs[i]中拷贝到sbi->devs[i]中
+	//初始化设备链表，从raw_super.devs[i]中拷贝到sbi->devs[i]中188832063
 	err = f2fs_scan_devices(sbi);
 	if (err) {
 		f2fs_msg(sb, KERN_ERR, "Failed to find devices");
@@ -2807,6 +2811,9 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 	//初始化inode management cache进行inode 管理
 	init_ino_entry_info(sbi);
 
+
+	
+	
 	/* setup f2fs internal modules */
 	//建立segments的管理信息，如sit，free_segmap,dirty_segmap,curseg
 	err = build_segment_manager(sbi);
@@ -2815,7 +2822,7 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 			"Failed to initialize F2FS segment manager");
 		goto free_sm;
 	}
-
+	
 	// node管理，nat_block，nat_block_bitmap,每个nat_block中nat entry的bitmap，free_nid的bitmap
 	err = build_node_manager(sbi);
 	if (err) {
@@ -2823,7 +2830,7 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 			"Failed to initialize F2FS node manager");
 		goto free_nm;
 	}
-
+	
 	/* For write statistics */
 	if (sb->s_bdev->bd_part)
 		sbi->sectors_written_start =
@@ -2840,6 +2847,7 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 	
 	build_gc_manager(sbi);
 
+	
 	/* get an inode for node space */
 	sbi->node_inode = f2fs_iget(sb, F2FS_NODE_INO(sbi)); // 1
 	if (IS_ERR(sbi->node_inode)) {
@@ -2847,10 +2855,13 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		err = PTR_ERR(sbi->node_inode);
 		goto free_nm;
 	}
-
+	
 	err = f2fs_build_stats(sbi);
 	if (err)
 		goto free_node_inode;
+
+	amf_dbg_msg("before mdelay3\n");
+		mdelay(10000);
 
 	/* read root inode and dentry */
 	/*
@@ -2864,17 +2875,22 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		err = PTR_ERR(root);
 		goto free_stats;
 	}
+	
+	
 	if (!S_ISDIR(root->i_mode) || !root->i_blocks || !root->i_size) {
 		iput(root);
 		err = -EINVAL;
 		goto free_node_inode;
 	}
+	
 	//每个超级块都存在一个root inode对应的目录项dentry,其中结点号是dentry->d_iname="/"
 	sb->s_root = d_make_root(root); /* allocate root dentry */
 	if (!sb->s_root) {
 		err = -ENOMEM;
 		goto free_root_inode;
 	}
+	amf_dbg_msg("before mdelay4\n");
+		mdelay(20000);
 
 	err = f2fs_register_sysfs(sbi);
 	if (err)
@@ -2898,6 +2914,9 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 	err = recover_orphan_inodes(sbi);
 	if (err)
 		goto free_meta;
+
+	amf_dbg_msg("before mdelay5\n");
+	mdelay(20000);
 
 	/* recover fsynced data */
 	if (!test_opt(sbi, DISABLE_ROLL_FORWARD)) {//没有disable_roll_forward
@@ -2938,6 +2957,9 @@ skip_recovery:
 	/* recover_fsync_data() cleared this already */
 	clear_sbi_flag(sbi, SBI_POR_DOING);
 
+	amf_dbg_msg("before mdelay5\n");
+	mdelay(20000);
+
 	/*
 	 * If filesystem is not mounted as read-only then
 	 * do start the gc_thread.
@@ -2958,12 +2980,20 @@ skip_recovery:
 			sbi->valid_super_block ? 1 : 2, err);
 	}
 
+	amf_dbg_msg("before mdelay6\n");
+	mdelay(20000);
+
 	f2fs_join_shrinker(sbi);
 
 	f2fs_msg(sbi->sb, KERN_NOTICE, "Mounted with checkpoint version = %llx",
 				cur_cp_version(F2FS_CKPT(sbi)));
 	f2fs_update_time(sbi, CP_TIME);
 	f2fs_update_time(sbi, REQ_TIME);
+
+	
+	amf_dbg_msg("before mdelay7\n");
+	mdelay(20000);
+	
 	return 0;
 
 free_meta:

@@ -421,7 +421,7 @@ static void tgt_end_io_erase(struct nvm_rq* rqd)
 	
 	struct bio* bio = rqd->bio;
 	pr_notice("=====================Enter tgt_end_io_erase()\n");
-	
+	pr_notice("rqd->ppa_addr.ppa = 0x%llx\n", rqd->ppa_addr.ppa);
 	kfree(rqd);
 }
 
@@ -693,14 +693,14 @@ static int tgt_submit_page_erase_sync(struct f2fs_sb_info *sbi, struct ppa_addr 
 //erase的提交函数
 static int tgt_submit_addr_erase_async(struct f2fs_sb_info* sbi, block_t paddr, uint32_t nr_blks){
 	struct nvm_tgt_dev* dev = sbi->s_lightpblk->tgt_dev;
-	int erase_num = 1;
+	int erase_num = 0;
 	int pg_per_sec = sbi->segs_per_sec * (1 << sbi->log_blocks_per_seg);
 	int i;
 	int ret;
 
 	if(nr_blks == pg_per_sec){//每次擦除一个section，512对应设备一个line中的4个blk
-		erase_num = 4;
-		pr_notice("erase 4 blk\n");
+		erase_num = 1;
+		pr_notice("erase 1 blk\n");
 	}
 	
 	//有一个大问题，就是数据的组织，segment的粒度，烦，先暂时按一个ppa一个ppa地擦除
@@ -711,7 +711,6 @@ static int tgt_submit_addr_erase_async(struct f2fs_sb_info* sbi, block_t paddr, 
 		ppa.g.pl = 0;
 		ppa.g.sec = 0;
 		
-		pr_notice("tgt_submit_erase(): ppa = 0x%llx\n", ppa.ppa);
 		if(tgt_boundary_ppa_checks(dev, &ppa, 1)){
 				pr_notice("tgt_boundary_ppa_checks_error()\n");
 		}

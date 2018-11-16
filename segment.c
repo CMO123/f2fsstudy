@@ -3629,24 +3629,47 @@ static int build_sit_entries(struct f2fs_sb_info *sbi)
 	struct f2fs_journal *journal = curseg->journal;
 	struct seg_entry *se;
 	struct f2fs_sit_entry sit;
-	int sit_blk_cnt = SIT_BLK_CNT(sbi);
+	int sit_blk_cnt = SIT_BLK_CNT(sbi);//147
 	unsigned int i, start, end;
 	unsigned int readed, start_blk = 0;
 	int err = 0;
 	//读取sit信息到sit_i->sentries[]中缓存
+//pr_notice("sit_blk_cnt = %d\n", sit_blk_cnt);//147
 	do {
 		readed = ra_meta_pages(sbi, start_blk, BIO_MAX_PAGES,
 							META_SIT, true);
-
+		// f2fs:current_sit_addr:717: offset = 146, blk_addr = 3218
+		//pr_notice("after ra_meta_pages(), readed = %d\n", readed);//147
+		
+		
+		
 		start = start_blk * sit_i->sents_per_block;
 		end = (start_blk + readed) * sit_i->sents_per_block;
+		
+	//pr_notice("sit_i->sents_per_block = %d\n",sit_i->sents_per_block);
+	//pr_notice("end = %d\n", end);//8085
+	//mdelay(20000);
 
 		for (; start < end && start < MAIN_SEGS(sbi); start++) {
 			struct f2fs_sit_block *sit_blk;
 			struct page *page;
 
 			se = &sit_i->sentries[start];
-			page = get_current_sit_page(sbi, start);
+
+			page = get_current_sit_page(sbi, start);//metapage index:0 -3218,为什么index至少40个没变？,为什么index = 3215，而start=7876，start确实在自增但index为什么没有
+			//这里实际是为了读取每个sit中seg信息。所以重复读了
+			//pr_notice("after get_current_sit_page, start = %d\n", start);//start: 0 - 8075 = 146*55
+			//mdelay(10000);
+			/*
+			f2fs:current_sit_addr:717: offset = 0, blk_addr = 3072
+			[  471.679462] f2fs:__get_meta_page:74: __get_meta_page() index = 3072
+			[  471.679474] f2fs:build_sit_entries:3657: after get_current_sit_page, start = 1
+			[  481.681698] f2fs:seg_info_from_raw_sit:358: se->valid_blocks = 0, se->ckpt_valid_blocks= 0, se->type = 0
+			[  481.681701] f2fs:current_sit_addr:717: offset = 0, blk_addr = 3072
+			[  481.681703] f2fs:__get_meta_page:74: __get_meta_page() index = 3072
+			[  481.681713] f2fs:build_sit_entries:3657: after get_current_sit_page, start = 2
+			*/
+			
 			sit_blk = (struct f2fs_sit_block *)page_address(page);
 			sit = sit_blk->entries[SIT_ENTRY_OFFSET(sit_i, start)];
 			f2fs_put_page(page, 1);
@@ -3692,8 +3715,15 @@ static int build_sit_entries(struct f2fs_sb_info *sbi)
 		err = check_block_count(sbi, start, &sit);
 		if (err)
 			break;
-		seg_info_from_raw_sit(se, &sit);
-
+		seg_info_from_raw_sit(se, &sit);//得到了6个
+	/*
+		[  422.147687] f2fs:seg_info_from_raw_sit:358: se->valid_blocks = 1, se->ckpt_valid_blocks= 1, se->type = 3
+		[  422.147689] f2fs:seg_info_from_raw_sit:358: se->valid_blocks = 0, se->ckpt_valid_blocks= 0, se->type = 4
+		[  422.147691] f2fs:seg_info_from_raw_sit:358: se->valid_blocks = 0, se->ckpt_valid_blocks= 0, se->type = 5
+		[  422.147694] f2fs:seg_info_from_raw_sit:358: se->valid_blocks = 1, se->ckpt_valid_blocks= 1, se->type = 0
+		[  422.147696] f2fs:seg_info_from_raw_sit:358: se->valid_blocks = 0, se->ckpt_valid_blocks= 0, se->type = 1
+		[  422.147698] f2fs:seg_info_from_raw_sit:358: se->valid_blocks = 0, se->ckpt_valid_blocks= 0, se->type = 2
+	*/
 		if (f2fs_discard_en(sbi)) {
 			if (is_set_ckpt_flags(sbi, CP_TRIMMED_FLAG)) {
 				memset(se->discard_map, 0xff,
@@ -3870,36 +3900,52 @@ int build_segment_manager(struct f2fs_sb_info *sbi)
 
 	init_rwsem(&sm_info->curseg_lock);
 
+	
 	if (!f2fs_readonly(sbi->sb)) {
 		err = create_flush_cmd_control(sbi);//初始化f2fs_sm_info->fcc结构，并创建f2fs_issue_flush线程
 		if (err)
 			return err;
 	}
-
+	
+	
 	err = create_discard_cmd_control(sbi);//初始化f2fs_sm_info->dcc结构，并创建f2fs_issue_discard线程
 	if (err)
 		return err;
+
+	
+
 	// 创建sbi->sm_info->sit_info，
 	err = build_sit_info(sbi);
 	if (err)
 		return err;
+	
 	// 为sm_info创建free_segmap_info，初始化segments全为dirty
 	err = build_free_segmap(sbi);
 	if (err)
 		return err;
 	// 为sm_info创建curseg_array
+
+
+	
+
 	err = build_curseg(sbi);
 	if (err)
 		return err;
 
 	/* reinit free segmap based on SIT */
 	//读取SIT信息和journal中的sit信息，放入sm_info->sit_i->sentries[]中
+		
 	err = build_sit_entries(sbi);
 	if (err)
 		return err;
+
+	
+	
 	//根据SIT信息，设置free_segment_map中的信息
 	init_free_segmap(sbi);
 	//根据free_segmap和SIT信息初始化dirty_seglist_info
+
+	
 	err = build_dirty_segmap(sbi);
 	if (err)
 		return err;

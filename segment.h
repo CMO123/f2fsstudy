@@ -346,6 +346,7 @@ static inline void seg_info_from_raw_sit(struct seg_entry *se,
 {//从sit中构建seg_entry信息
 	se->valid_blocks = GET_SIT_VBLOCKS(rs);
 	se->ckpt_valid_blocks = GET_SIT_VBLOCKS(rs);
+
 	memcpy(se->cur_valid_map, rs->valid_map, SIT_VBLOCK_MAP_SIZE);
 	memcpy(se->ckpt_valid_map, rs->valid_map, SIT_VBLOCK_MAP_SIZE);
 #ifdef CONFIG_F2FS_CHECK_FS
@@ -353,6 +354,8 @@ static inline void seg_info_from_raw_sit(struct seg_entry *se,
 #endif
 	se->type = GET_SIT_TYPE(rs);
 	se->mtime = le64_to_cpu(rs->mtime);
+	
+	pr_notice("se->valid_blocks = %d, se->ckpt_valid_blocks= %d, se->type = %d\n",se->valid_blocks, se->ckpt_valid_blocks, se->type);//里面得到的都是0
 }
 
 static inline void __seg_info_to_raw_sit(struct seg_entry *se,
@@ -694,8 +697,11 @@ static inline pgoff_t current_sit_addr(struct f2fs_sb_info *sbi,
 {
 	struct sit_info *sit_i = SIT_I(sbi);
 	unsigned int offset = SIT_BLOCK_OFFSET(start);
-	block_t blk_addr = sit_i->sit_base_addr + offset;
 
+	block_t blk_addr = sit_i->sit_base_addr + offset;//sit_base_addr  = 3072
+
+//pr_notice("sit_i->sit_bitmap = 0x%llx\n",sit_i->sit_bitmap);
+//pr_notice("SIT_ENTRY_PER_BLOCK = %d\n", SIT_ENTRY_PER_BLOCK);//SIT_ENTRY_PER_BLOCK = 55
 	check_seg_range(sbi, start);
 
 #ifdef CONFIG_F2FS_CHECK_FS
@@ -706,7 +712,9 @@ static inline pgoff_t current_sit_addr(struct f2fs_sb_info *sbi,
 
 	/* calculate sit block address */
 	if (f2fs_test_bit(offset, sit_i->sit_bitmap))
-		blk_addr += sit_i->sit_blocks;
+		blk_addr += sit_i->sit_blocks;//sit_i->sit_blocks = 512
+
+//pr_notice("offset = %d, blk_addr = %d\n", offset, blk_addr);//offset 从0 到146
 
 	return blk_addr;
 }

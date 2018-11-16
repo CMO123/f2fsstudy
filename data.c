@@ -415,10 +415,12 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 
 #ifdef AMF_META_LOGGING
 	if (is_gc_needed (fio->sbi, get_metalog_free_blks (fio->sbi)) == 0) {
-		if (amf_do_gc (fio->sbi) != 0) {
-			amf_dbg_msg ("[ERROR] risa_do_gc failed\n");
+		amf_dbg_msg("is_gc_needed()\n");
+		if (amf_do_gc(fio->sbi) != 0) {
+			amf_dbg_msg ("[ERROR] amf_do_gc failed\n");
 		}
 	}
+	
 #endif
 
 	struct bio *bio;

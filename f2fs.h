@@ -29,7 +29,7 @@
 #define __FS_HAS_ENCRYPTION IS_ENABLED(CONFIG_F2FS_FS_ENCRYPTION)
 #include <linux/fscrypt.h>
 
-//#define pr_fmt(fmt) KBUILD_MODNAME ":%s:%d: " fmt, __func__, __LINE__
+#define pr_fmt(fmt) KBUILD_MODNAME ":%s:%d: " fmt, __func__, __LINE__
 
 
 #ifdef CONFIG_F2FS_CHECK_FS
@@ -1356,8 +1356,8 @@ static inline u32 f2fs_crc32(struct f2fs_sb_info *sbi, const void *address,
 static inline bool f2fs_crc_valid(struct f2fs_sb_info *sbi, __u32 blk_crc,
 				  void *buf, size_t buf_size)
 {
-	pr_notice("blk_crc = %d\n", blk_crc);
-	pr_notice("f2fs_crc32(sbi, buf, buf_size) = %d\n",f2fs_crc32(sbi, buf, buf_size));
+	//pr_notice("blk_crc = %d\n", blk_crc);
+	//pr_notice("f2fs_crc32(sbi, buf, buf_size) = %d\n",f2fs_crc32(sbi, buf, buf_size));
 	return f2fs_crc32(sbi, buf, buf_size) == blk_crc;
 }
 
