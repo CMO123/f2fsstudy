@@ -847,7 +847,7 @@ static inline sector_t amf_get_lba(struct bio *bio)
 }
 static inline unsigned int amf_get_secs(struct bio *bio)
 {
-	return  bio->bi_iter.bi_size >> F2FS_BLKSIZE;
+	return  bio->bi_iter.bi_size / F2FS_BLKSIZE;
 }
 /*这两个是main area的数据读写*/
 void amf_submit_bio_read (struct f2fs_sb_info* sbi, struct bio* bio)
@@ -857,13 +857,17 @@ void amf_submit_bio_read (struct f2fs_sb_info* sbi, struct bio* bio)
 	struct nvm_geo* geo = &dev->geo;
 	struct nvm_rq *rqd;
 	uint32_t lblkaddr = amf_get_lba(bio);
-	unsigned int nr_secs = amf_get_secs(bio);
+	unsigned int nr_secs = amf_get_secs(bio); 
 	int i, j =0;
+	int ret = NVM_IO_ERR;
+
 
 	/*设置rqd*/
 	rqd = kzalloc(sizeof(struct nvm_rq), GFP_KERNEL);
 	rqd->dev = dev;
 	rqd->opcode = NVM_OP_PREAD;
+	bio_get(bio);
+	 
 	rqd->bio = bio;
 	rqd->nr_ppas = nr_secs;
 	rqd->private = sbi;
@@ -872,7 +876,7 @@ void amf_submit_bio_read (struct f2fs_sb_info* sbi, struct bio* bio)
 							&rqd->dma_meta_list);	
 	if (!rqd->meta_list) {
 			pr_err("pblk: not able to allocate ppa list\n");
-			return -EFAULT;
+			goto fail_rqd_free;
 	}
 	if (nr_secs > 1) {
 		rqd->ppa_list = rqd->meta_list + tgt_dma_meta_size;
@@ -884,18 +888,38 @@ void amf_submit_bio_read (struct f2fs_sb_info* sbi, struct bio* bio)
 
 		for(i = 0; i < nr_secs; i++){
 			rqd->ppa_list[j++] = addr_ppa32_to_ppa64(sbi, lblkaddr+i);
+			pr_notice("rqd->ppa_list = 0x%llx\n", rqd->ppa_list[j-1]);
 		}		
 		
 	}else{
 		rqd->ppa_addr = addr_ppa32_to_ppa64(sbi, lblkaddr);
+		pr_notice("rqd->ppa_addr = 0x%llx\n", rqd->ppa_addr);
 		rqd->flags = NVM_IO_SUSPEND | NVM_IO_SCRAMBLE_ENABLE;	
 	}
 
-	bio_get(bio);
+	ret =  nvm_submit_io(dev, rqd);
 
-	return nvm_submit_io(dev, rqd);
+	if(rqd->error){
+		pr_notice("amf: read error:%d\n", rqd->error);
+	}
+	if(ret == NVM_IO_DONE && bio_flagged(bio, BIO_CLONED))
+		bio_put(bio);
 	
+	if(ret == NVM_IO_ERR){
+		pr_err("amf: read IO submission failed\n"); 
+		bio_io_error(bio);
+		return ret;
+	}else if(ret == NVM_IO_DONE){
+		bio_endio(bio);
+	}
+	
+	return NVM_IO_OK;	
 
+fail_rqd_free:
+fail_end_io:
+	nvm_dev_dma_free(dev->parent, rqd->meta_list, rqd->dma_meta_list);
+	kfree(rqd);
+	return ret;
 }
 void amf_submit_bio_write(struct f2fs_sb_info* sbi, struct bio* bio)
 {
@@ -1125,7 +1149,8 @@ amf_dbg_msg("lblkaddr = %d enter amf_is_cp_blk()\n", lblkaddr);
 	
 			start = bio->bi_iter.bi_size >> F2FS_BLKSIZE_BITS;
 			start %= F2FS_IO_SIZE(sbi);
-	
+	pr_notice("bio->bi_iter.bi_size = %d\n", bio->bi_iter.bi_size);
+	pr_notice("start = %d\n", start);
 			if (start == 0)
 				goto submit_io;
 	
@@ -1159,7 +1184,7 @@ submit_io:
 		if(is_read_io(bio_op(bio))){
 			amf_submit_bio_read(sbi, bio);
 		}else{
-			amf_submit_bio_write(sbi, bio);
+			amf_submit_bio_write(sbi, bio);			
 		}
 #else
 #ifdef AMF_PMU

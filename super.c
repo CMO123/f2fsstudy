@@ -1992,6 +1992,7 @@ static inline bool sanity_check_area_boundary(struct f2fs_sb_info *sbi,
 			segment_count_ssa << log_blocks_per_seg);
 		return true;
 	}
+	
 
 	if (main_end_blkaddr > seg_end_blkaddr) {
 		f2fs_msg(sb, KERN_INFO,
@@ -2108,7 +2109,7 @@ static int sanity_check_raw_super(struct f2fs_sb_info *sbi,
 
 	/* check CP/SIT/NAT/SSA/MAIN_AREA area boundary */
 	//if (sanity_check_area_boundary(sbi, bh))
-	//	return 1;
+//		return 1;
 
 	return 0;
 }
@@ -2860,9 +2861,6 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 	if (err)
 		goto free_node_inode;
 
-	amf_dbg_msg("before mdelay3\n");
-		mdelay(10000);
-
 	/* read root inode and dentry */
 	/*
 	该函数能够查询特定超级块下指定inode number的inode。如果inode number不存在，则创建新的inode，并将inode number赋值给新的inode.
@@ -2889,9 +2887,7 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		err = -ENOMEM;
 		goto free_root_inode;
 	}
-	amf_dbg_msg("before mdelay4\n");
-		mdelay(20000);
-
+	
 	err = f2fs_register_sysfs(sbi);
 	if (err)
 		goto free_root_inode;
@@ -2915,8 +2911,6 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 	if (err)
 		goto free_meta;
 
-	amf_dbg_msg("before mdelay5\n");
-	mdelay(20000);
 
 	/* recover fsynced data */
 	if (!test_opt(sbi, DISABLE_ROLL_FORWARD)) {//没有disable_roll_forward
@@ -2957,8 +2951,7 @@ skip_recovery:
 	/* recover_fsync_data() cleared this already */
 	clear_sbi_flag(sbi, SBI_POR_DOING);
 
-	amf_dbg_msg("before mdelay5\n");
-	mdelay(20000);
+	
 
 	/*
 	 * If filesystem is not mounted as read-only then
@@ -2980,9 +2973,7 @@ skip_recovery:
 			sbi->valid_super_block ? 1 : 2, err);
 	}
 
-	amf_dbg_msg("before mdelay6\n");
-	mdelay(20000);
-
+	
 	f2fs_join_shrinker(sbi);
 
 	f2fs_msg(sbi->sb, KERN_NOTICE, "Mounted with checkpoint version = %llx",
@@ -2990,9 +2981,10 @@ skip_recovery:
 	f2fs_update_time(sbi, CP_TIME);
 	f2fs_update_time(sbi, REQ_TIME);
 
+
+	pr_notice("before mdelay\n");
+	mdelay(10000);
 	
-	amf_dbg_msg("before mdelay7\n");
-	mdelay(20000);
 	
 	return 0;
 

@@ -15,6 +15,7 @@
 #include <linux/blkdev.h>
 #include <linux/pagevec.h>
 #include <linux/swap.h>
+#include <linux/delay.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -1118,7 +1119,7 @@ static int read_node_page(struct page *page, int op_flags)
 
 	if (PageUptodate(page))
 		return LOCKED_PAGE;
-pr_notice("page->index = 0x%lx\n",page->index);
+	
 	get_node_info(sbi, page->index, &ni);
 
 	if (unlikely(ni.blk_addr == NULL_ADDR)) {
@@ -1127,7 +1128,12 @@ pr_notice("page->index = 0x%lx\n",page->index);
 	}
 
 	fio.new_blkaddr = fio.old_blkaddr = ni.blk_addr;
-	return f2fs_submit_page_bio(&fio);
+
+	
+
+	int ret = f2fs_submit_page_bio(&fio);
+
+	return ret;
 }
 
 /*
@@ -1166,10 +1172,13 @@ static struct page *__get_node_page(struct f2fs_sb_info *sbi, pgoff_t nid,
 		return ERR_PTR(-ENOENT);
 	f2fs_bug_on(sbi, check_nid_range(sbi, nid));
 repeat:
+	
+	
 	page = f2fs_grab_cache_page(NODE_MAPPING(sbi), nid, false);//找到nid所在的缓存page。难道将所有inode都缓存在cache中了？？？
 	if (!page)
 		return ERR_PTR(-ENOMEM);
-
+	pr_notice("__get_node_page() ,nid = %d\n", nid);//3
+	
 	err = read_node_page(page, 0);
 	if (err < 0) {
 		f2fs_put_page(page, 1);
@@ -1178,7 +1187,7 @@ repeat:
 		err = 0;
 		goto page_hit;
 	}
-
+	
 	if (parent)
 		ra_node_pages(parent, start + 1, MAX_RA_NODE);
 

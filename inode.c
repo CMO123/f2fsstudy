@@ -13,6 +13,8 @@
 #include <linux/buffer_head.h>
 #include <linux/backing-dev.h>
 #include <linux/writeback.h>
+#include <linux/delay.h>
+
 
 #include "f2fs.h"
 #include "node.h"
@@ -195,7 +197,7 @@ static int do_read_inode(struct inode *inode)
 	struct f2fs_inode *ri;
 	projid_t i_projid;
 
-pr_notice("Enter do_read_inode()， inode->i_ino = 0x%lx\n",inode->i_ino);
+pr_notice("Enter do_read_inode()， inode->i_ino = 0x%lx\n",inode->i_ino);//3
 
 	/* Check if ino is within scope */
 	if (check_nid_range(sbi, inode->i_ino)) {
@@ -205,12 +207,11 @@ pr_notice("Enter do_read_inode()， inode->i_ino = 0x%lx\n",inode->i_ino);
 		return -EINVAL;
 	}
 
-	pr_notice("before mdelay4\n");
-	mdelay(10000);
+	 
 
 	node_page = get_node_page(sbi, inode->i_ino);
 	if (IS_ERR(node_page))
-		return PTR_ERR(node_page);
+		return PTR_ERR(node_page); 
 
 	ri = F2FS_INODE(node_page);
 
@@ -319,8 +320,7 @@ pr_notice("inode is newly create?? inode->i_state & I_NEW =0x%lx\n",inode->i_sta
 		trace_f2fs_iget(inode);
 		return inode;	//返回找到的已经存在的inode
 	}
-	amf_dbg_msg("before mdelay4\n");
-	mdelay(10000);
+	
 	
 	////////////////////////////新建的inode////////////////////////////////////////////////////////////////
 	if (ino == F2FS_NODE_INO(sbi) || ino == F2FS_META_INO(sbi)) // ino == 1或2

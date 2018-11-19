@@ -23,6 +23,7 @@
 #include <linux/memcontrol.h>
 #include <linux/cleancache.h>
 #include <linux/sched/signal.h>
+#include <linux/delay.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -406,12 +407,15 @@ void f2fs_flush_merged_writes(struct f2fs_sb_info *sbi)
 	f2fs_submit_merged_write(sbi, META);
 }
 
+
 /*
  * Fill the locked page with data located in the block address.
  * A caller needs to unlock the page on failure.
  */
 int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 {
+
+pr_notice("Enter f2fs_submit_page_bio()\n");
 
 #ifdef AMF_META_LOGGING
 	if (is_gc_needed (fio->sbi, get_metalog_free_blks (fio->sbi)) == 0) {
