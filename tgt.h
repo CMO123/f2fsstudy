@@ -430,29 +430,11 @@ static void f2fs_write_end_io2(struct bio *bio)
 {
 	bio_put(bio);
 }
-static void f2fs_read_end_io2(struct bio *bio)
-{
-	struct bio_vec *bvec;
-	
-	int i;
-	bio_for_each_segment_all(bvec, bio, i) {
-		struct page *page = bvec->bv_page;
-		if (!bio->bi_status) {
-			if (!PageUptodate(page))
-				SetPageUptodate(page);
-		} else {
-			ClearPageUptodate(page);
-			SetPageError(page);
-		}
-		unlock_page(page);
-	}
-	bio_put(bio);
-}
+
 static void tgt_end_io_read(struct nvm_rq* rqd)
 {
-	struct bio* bio = rqd->bio;
-	bio_put(bio);
-	pr_notice("================== tgt_end_io_read()\n");
+	
+	//pr_notice("================== tgt_end_io_read()\n");
 	nvm_dev_dma_free(rqd->dev->parent, rqd->meta_list, rqd->dma_meta_list);
 	kfree(rqd);
 	
@@ -754,6 +736,7 @@ static int tgt_submit_page_read_sync(struct f2fs_sb_info *sbi, struct page* page
 
 	
 	ret = nvm_submit_io_sync(dev, &rqd);
+	//pr_notice("rqd.bio.bi_status = %d\n",rqd.bio->bi_status);
 	if(ret){
 		pr_err("tgt_pblk: emeta I/O submission failed: %d\n", ret);
 		bio_put(bio);

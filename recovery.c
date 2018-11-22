@@ -10,6 +10,8 @@
  */
 #include <linux/fs.h>
 #include <linux/f2fs_fs.h>
+#include <linux/delay.h>
+
 #include "f2fs.h"
 #include "node.h"
 #include "segment.h"
@@ -642,6 +644,7 @@ int recover_fsync_data(struct f2fs_sb_info *sbi, bool check_only)
 
 	/* step #1: find fsynced inode numbers */
 	err = find_fsync_dnodes(sbi, &inode_list, check_only);
+	
 	if (err || list_empty(&inode_list))
 		goto skip;
 
@@ -680,7 +683,7 @@ skip:
 		};
 		err = write_checkpoint(sbi, &cpc);
 	}
-
+	
 	kmem_cache_destroy(fsync_entry_slab);
 out:
 #ifdef CONFIG_QUOTA

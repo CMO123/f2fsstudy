@@ -197,7 +197,7 @@ static int do_read_inode(struct inode *inode)
 	struct f2fs_inode *ri;
 	projid_t i_projid;
 
-pr_notice("Enter do_read_inode()， inode->i_ino = 0x%lx\n",inode->i_ino);//3
+//pr_notice("Enter do_read_inode()， inode->i_ino = 0x%lx\n",inode->i_ino);//3
 
 	/* Check if ino is within scope */
 	if (check_nid_range(sbi, inode->i_ino)) {

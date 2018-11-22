@@ -78,7 +78,7 @@ static void f2fs_read_end_io(struct bio *bio)
 
 	bio_for_each_segment_all(bvec, bio, i) {
 		struct page *page = bvec->bv_page;
-
+	//pr_notice("bio->bi_status = %d\n",bio->bi_status);
 		if (!bio->bi_status) {
 			if (!PageUptodate(page))
 				SetPageUptodate(page);
@@ -107,8 +107,11 @@ static void f2fs_write_end_io(struct bio *bio)
 			unlock_page(page);
 			mempool_free(page, sbi->write_io_dummy);
 
-			if (unlikely(bio->bi_status))
+			if (unlikely(bio->bi_status)){
+				pr_notice("bio->bi_status = %d",bio->bi_status);
 				f2fs_stop_checkpoint(sbi, true);
+			}
+				
 			continue;
 		}
 
@@ -116,8 +119,11 @@ static void f2fs_write_end_io(struct bio *bio)
 
 		if (unlikely(bio->bi_status)) {
 			mapping_set_error(page->mapping, -EIO);
-			if (type == F2FS_WB_CP_DATA)
+			if (type == F2FS_WB_CP_DATA){
+				pr_notice("bio->bi_status = %d",bio->bi_status);
 				f2fs_stop_checkpoint(sbi, true);
+			}
+				
 		}
 
 		f2fs_bug_on(sbi, page->mapping == NODE_MAPPING(sbi) &&
@@ -253,17 +259,19 @@ submit_io:
 
 #endif
 }
+		
 
 static void __submit_merged_bio(struct f2fs_bio_info *io)
 {
-#ifdef AMF_META_LOGGING
+//pr_notice("Enter __submit_merged_bio()\n");
+#ifdef AMF_META_LOGGING	
 	if (is_gc_needed (io->sbi, get_metalog_free_blks (io->sbi)) == 0) {
 		if (amf_do_gc (io->sbi) != 0) {
 			amf_dbg_msg ("[ERROR] amf_do_gc failed\n");
 		}
 	}
 #endif
-
+	
 	struct f2fs_io_info *fio = &io->fio;
 
 	if (!io->bio)
@@ -294,6 +302,8 @@ static void __submit_merged_bio(struct f2fs_bio_info *io)
 
 	io->bio = NULL;
 }
+
+
 
 static bool __has_merged_page(struct f2fs_bio_info *io,
 				struct inode *inode, nid_t ino, pgoff_t idx)
@@ -387,11 +397,15 @@ static void __submit_merged_write_cond(struct f2fs_sb_info *sbi,
 			break;
 	}
 }
+				
 
 void f2fs_submit_merged_write(struct f2fs_sb_info *sbi, enum page_type type)
 {
 	__submit_merged_write_cond(sbi, NULL, 0, 0, type, true);
 }
+
+
+
 
 void f2fs_submit_merged_write_cond(struct f2fs_sb_info *sbi,
 				struct inode *inode, nid_t ino, pgoff_t idx,
@@ -399,6 +413,7 @@ void f2fs_submit_merged_write_cond(struct f2fs_sb_info *sbi,
 {
 	__submit_merged_write_cond(sbi, inode, ino, idx, type, false);
 }
+				
 
 void f2fs_flush_merged_writes(struct f2fs_sb_info *sbi)
 {
@@ -415,7 +430,7 @@ void f2fs_flush_merged_writes(struct f2fs_sb_info *sbi)
 int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 {
 
-pr_notice("Enter f2fs_submit_page_bio()\n");
+//pr_notice("Enter f2fs_submit_page_bio()\n");
 
 #ifdef AMF_META_LOGGING
 	if (is_gc_needed (fio->sbi, get_metalog_free_blks (fio->sbi)) == 0) {
@@ -474,7 +489,7 @@ int f2fs_submit_page_write(struct f2fs_io_info *fio)
 	struct f2fs_bio_info *io = sbi->write_io[btype] + fio->temp;
 	struct page *bio_page;
 	int err = 0;
-
+pr_notice("Enter f2fs_submit_page_write()===========\n");
 	f2fs_bug_on(sbi, is_read_io(fio->op));
 
 
@@ -515,8 +530,10 @@ alloc_new:
 			dec_page_count(sbi, WB_DATA_TYPE(bio_page));
 			goto out_fail;
 		}
+		//io->bio = __bio_alloc(sbi, fio->new_blkaddr, fio->io_wbc,
+		//				BIO_MAX_PAGES, false);
 		io->bio = __bio_alloc(sbi, fio->new_blkaddr, fio->io_wbc,
-						BIO_MAX_PAGES, false);
+					64, false);
 		io->fio = *fio;
 	}
 
@@ -577,7 +594,7 @@ static int f2fs_submit_page_read(struct inode *inode, struct page *page,
 							block_t blkaddr)
 {
 	struct bio *bio = f2fs_grab_read_bio(inode, blkaddr, 1);
-pr_notice("Enter f2fs_submit_page_read()\n");
+//pr_notice("Enter f2fs_submit_page_read()\n");
 
 	if (IS_ERR(bio))
 		return PTR_ERR(bio);
@@ -1726,6 +1743,7 @@ bool should_update_outplace(struct inode *inode, struct f2fs_io_info *fio)
 static inline bool need_inplace_update(struct f2fs_io_info *fio)
 {
 #ifdef AMF_NO_SSR
+pr_notice("need_inplace_update = false\n");
 	return false;
 #else
 	struct inode *inode = fio->page->mapping->host;
@@ -1755,6 +1773,7 @@ int do_write_data_page(struct f2fs_io_info *fio)
 	bool ipu_force = false;
 	int err = 0;
 
+pr_notice("Enter do_write_data_page(), page->index = %d\n", page->index);
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
 	if (need_inplace_update(fio) &&
 			f2fs_lookup_extent_cache(inode, page->index, &ei)) {
@@ -1827,6 +1846,8 @@ out_writepage:
 out:
 	if (fio->need_lock == LOCK_REQ)
 		f2fs_unlock_op(fio->sbi);
+
+	pr_notice("End do_write_data_page()======err = %d\n",err);
 	return err;
 }
 
@@ -1858,18 +1879,22 @@ static int __write_data_page(struct page *page, bool *submitted,
 		.io_type = io_type,
 		.io_wbc = wbc,
 	};
-	
+
+	pr_notice("Enter __write_data_page()=========\n");
 
 	trace_f2fs_writepage(page, DATA);
 
 	/* we should bypass data pages to proceed the kworkder jobs */
 	if (unlikely(f2fs_cp_error(sbi))) {
+		pr_notice("f2fs_cp_error()\n");
 		mapping_set_error(page->mapping, -EIO);
 		goto out;
 	}
 
-	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING)))
+	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING))){
+		pr_notice("is_sbi_flag_set\n");
 		goto redirty_out;
+		}
 
 	if (page->index < end_index)
 		goto write;
@@ -1958,6 +1983,7 @@ out:
 	if (submitted)
 		*submitted = fio.submitted;
 
+pr_notice("End __write_data_page()\n");
 	return 0;
 
 redirty_out:
@@ -1971,6 +1997,7 @@ redirty_out:
 static int f2fs_write_data_page(struct page *page,
 					struct writeback_control *wbc)
 {
+pr_notice("in f2fs_write_data_page()");
 	return __write_data_page(page, NULL, wbc, FS_DATA_IO);
 }
 

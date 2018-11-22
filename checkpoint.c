@@ -29,6 +29,8 @@ struct kmem_cache *inode_entry_slab;
 
 void f2fs_stop_checkpoint(struct f2fs_sb_info *sbi, bool end_io)
 {
+pr_notice("f2fs_stop_checkpoint()\n");
+mdelay(10000);
 	set_ckpt_flags(sbi, CP_ERROR_FLAG);
 	if (!end_io)
 		f2fs_flush_merged_writes(sbi);
@@ -71,10 +73,11 @@ static struct page *__get_meta_page(struct f2fs_sb_info *sbi, pgoff_t index,
 		.new_blkaddr = index,
 		.encrypted_page = NULL,
 	};
-pr_notice("__get_meta_page() index = %d\n",index);
+//pr_notice("__get_meta_page() index = %d\n",index);
 	if (unlikely(!is_meta))
 		fio.op_flags &= ~REQ_META;
 repeat:
+pr_notice("__get_meta_page, index = %d\n", index);
 	page = f2fs_grab_cache_page(mapping, index, false);//获取或创建一个page
 	if (!page) {
 		cond_resched();
@@ -101,8 +104,11 @@ repeat:
 	 * readonly and make sure do not write checkpoint with non-uptodate
 	 * meta page.
 	 */
-	if (unlikely(!PageUptodate(page)))
+	if (unlikely(!PageUptodate(page))){
+		pr_notice("in __get_meta_page()==================================\n");
 		f2fs_stop_checkpoint(sbi, false);
+	}
+	
 out:
 	return page;
 }
@@ -1211,7 +1217,8 @@ static int do_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	struct curseg_info *seg_i = CURSEG_I(sbi, CURSEG_HOT_NODE);
 	u64 kbytes_written;
 	int err;
-
+pr_notice("Enter do_checkpoint()============\n");
+mdelay(10000);
 	/* Flush all the NAT/SIT pages */
 	while (get_pages(sbi, F2FS_DIRTY_META)) {
 		sync_meta_pages(sbi, META, LONG_MAX, FS_CP_META_IO);
@@ -1412,7 +1419,9 @@ int write_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 
 	trace_f2fs_write_checkpoint(sbi->sb, cpc->reason, "finish block_ops");
 
+	pr_notice("before f2fs_flush_merged_writes()\n");
 	f2fs_flush_merged_writes(sbi);
+	pr_notice("end f2fs_flush_merged_writes()\n");
 
 	/* this is the case of multiple fstrims without any changes */
 	if (cpc->reason & CP_DISCARD) {

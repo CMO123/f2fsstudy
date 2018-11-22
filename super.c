@@ -908,12 +908,8 @@ static void f2fs_put_super(struct super_block *sb)
 			amf_pmu_display(sbi);
 #endif
 		
-#ifdef AMF_SNAPSHOT
-			amf_write_mapping_entries(sbi);
-			amf_destory_ri(sbi);
-#endif
-	
 
+	
 	/* prevent remaining shrinker jobs */
 	mutex_lock(&sbi->umount_mutex);
 
@@ -929,19 +925,23 @@ static void f2fs_put_super(struct super_block *sb)
 		struct cp_control cpc = {
 			.reason = CP_UMOUNT,
 		};
+	//pr_notice("Enter this1?\n");//no
 		write_checkpoint(sbi, &cpc);
 	}
 
 	/* be sure to wait for any on-going discard commands */
 	dropped = f2fs_wait_discard_bios(sbi);
 
+
 	if (f2fs_discard_en(sbi) && !sbi->discard_blks && !dropped) {
 		struct cp_control cpc = {
 			.reason = CP_UMOUNT | CP_TRIMMED,
 		};
+	pr_notice("Enter this2?\n");//enter
 		write_checkpoint(sbi, &cpc);
 	}
 
+	
 	/* write_checkpoint can update stat informaion */
 	f2fs_destroy_stats(sbi);
 
@@ -955,9 +955,11 @@ static void f2fs_put_super(struct super_block *sb)
 	mutex_unlock(&sbi->umount_mutex);
 
 	/* our cp_error case, we can wait for any writeback page */
+
+	
 	f2fs_flush_merged_writes(sbi);
 
-
+	
 	iput(sbi->node_inode);
 	iput(sbi->meta_inode);
 
@@ -968,6 +970,12 @@ static void f2fs_put_super(struct super_block *sb)
 	kfree(sbi->ckpt);
 
 	f2fs_unregister_sysfs(sbi);
+
+#ifdef AMF_SNAPSHOT
+				amf_write_mapping_entries(sbi);
+				amf_destory_ri(sbi);
+#endif
+
 
 	sb->s_fs_info = NULL;
 	if (sbi->s_chksum_driver)
@@ -992,7 +1000,7 @@ int f2fs_sync_fs(struct super_block *sb, int sync)
 	struct f2fs_sb_info *sbi = F2FS_SB(sb);
 	int err = 0;
 
-//pr_notice("Enter f2fs_sync_fs()\n");
+pr_notice("Enter f2fs_sync_fs()\n");
 	if (unlikely(f2fs_cp_error(sbi)))
 		return 0;
 
@@ -1011,7 +1019,7 @@ int f2fs_sync_fs(struct super_block *sb, int sync)
 		mutex_unlock(&sbi->gc_mutex);
 	}
 	f2fs_trace_ios(NULL, 1);
-
+pr_notice("End f2fs_sync_fs(), err = %d\n",err);
 	return err;
 }
 
@@ -2188,7 +2196,9 @@ static void init_sb_info(struct f2fs_sb_info *sbi)
 	sbi->max_victim_search = DEF_MAX_VICTIM_SEARCH;
 
 	sbi->dir_level = DEF_DIR_LEVEL;
-	sbi->interval_time[CP_TIME] = DEF_CP_INTERVAL;
+	//sbi->interval_time[CP_TIME] = DEF_CP_INTERVAL;
+	sbi->interval_time[CP_TIME] = 6000;
+pr_notice("cp_time = %d(s)\n", sbi->interval_time[CP_TIME]);
 	sbi->interval_time[REQ_TIME] = DEF_IDLE_INTERVAL;
 	clear_sbi_flag(sbi, SBI_NEED_FSCK);
 
@@ -2488,6 +2498,7 @@ static int f2fs_scan_devices(struct f2fs_sb_info *sbi)
 	return 0;
 }
 
+
 //初始化struct super_block超级块的基本信息,s_magic(区分不同文件系统)、s_fs_info(记录文件系统超级块的基本信息)
 static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
 {
@@ -2705,14 +2716,15 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		}
 				
 			//修改core.c中nvm_create_tgt()
-		/*
+			
 		struct nvm_tgt_dev * a = sbi->s_lightpblk->tgt_dev;
 		pr_notice("tgt_dev的geo.nr_luns = 0x%x\n",a->geo.nr_luns);
 		pr_notice("tgt_dev的geo.all_luns = 0x%x\n",a->geo.all_luns);
 		int aret;
 		
+		/*
 		aret = tgt_submit_addr_erase_async(sbi, 545, 1);
-		mdelay(10000);
+		
 		
 		struct page* apage = alloc_page(GFP_NOFS | __GFP_ZERO);
 		uint8_t* ptr_page_addr = (uint8_t*)page_address(apage);
@@ -2728,8 +2740,39 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		//mdelay(10000);
 		pr_notice("ptr_page_addr2 = %d\n",*ptr_page_addr2);
 		//pr_notice("ptr_page_addr2->magic = %u, ptr_page_addr2->index = %u, ptr_page_addr2->mapping[0]=%u\n", ptr_page_addr2->magic, ptr_page_addr2->index, ptr_page_addr2->mapping[0]);
-		mdelay(20000);
+		mdelay(10000);
 		*/
+
+/*
+		struct bio* bio = f2fs_bio_alloc(sbi, 1, true);
+		f2fs_target_device(sbi, 59422, bio);
+		//bio->bi_end_io = f2fs_write_end_io_test;
+		//bio->bi_private = sbi;
+		
+		struct page* apage = alloc_page(GFP_NOFS | __GFP_ZERO);
+		uint8_t* ptr_page_addr = (uint8_t*)page_address(apage);
+		memset(ptr_page_addr,6,PAGE_SIZE);
+		pr_notice("ptr_page_addr1 = %d\n",*ptr_page_addr);		
+
+		
+		if (bio_add_page(bio, apage, PAGE_SIZE, 0) < PAGE_SIZE) {
+			pr_err("test_error: Error occur while calling bio_add_page");
+			bio_put(bio);
+		}
+		
+		bio_set_op_attrs(bio, REQ_OP_WRITE, 0);
+
+		amf_submit_bio_write_sync(sbi, bio);
+		//amf_submit_bio_write(sbi, bio);
+		//mdelay(10000);
+		pr_notice("bio->bi_status = %d\n",bio->bi_status);
+	
+		struct page* bpage = alloc_page(GFP_NOFS | __GFP_ZERO);
+		uint8_t* ptr_page_addr2 = (uint8_t*)page_address(bpage);
+		aret = tgt_submit_page_read_sync(sbi, bpage, 59422);
+		pr_notice("ptr_page_addr2 = %d\n",*ptr_page_addr2);
+	mdelay(20000);
+	*/	
 #endif	
 	
 
@@ -2889,8 +2932,11 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 	}
 	
 	err = f2fs_register_sysfs(sbi);
-	if (err)
+	if (err){
+		pr_notice("err\n");
 		goto free_root_inode;
+	}
+	
 
 #ifdef CONFIG_QUOTA
 	/*
@@ -2911,13 +2957,17 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 	if (err)
 		goto free_meta;
 
+	
+
+//暂时都注释掉
 
 	/* recover fsynced data */
+/*
 	if (!test_opt(sbi, DISABLE_ROLL_FORWARD)) {//没有disable_roll_forward
-		/*
-		 * mount should be failed, when device has readonly mode, and
-		 * previous checkpoint was not done by clean system shutdown.
-		 */
+		//
+		// mount should be failed, when device has readonly mode, and
+		// previous checkpoint was not done by clean system shutdown.
+		//
 		if (bdev_read_only(sb->s_bdev) &&
 				!is_set_ckpt_flags(sbi, CP_UMOUNT_FLAG)) {
 			err = -EROFS;
@@ -2926,8 +2976,8 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 
 		if (need_fsck)
 			set_sbi_flag(sbi, SBI_NEED_FSCK);
-
-		if (!retry)
+	
+		if (!retry)//retry = true;
 			goto skip_recovery;
 
 		err = recover_fsync_data(sbi, false);
@@ -2947,6 +2997,10 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 			goto free_meta;
 		}
 	}
+
+	pr_notice("before mdelay3()\n");
+	mdelay(10000);
+	*/
 skip_recovery:
 	/* recover_fsync_data() cleared this already */
 	clear_sbi_flag(sbi, SBI_POR_DOING);
@@ -2963,6 +3017,7 @@ skip_recovery:
 		if (err)
 			goto free_meta;
 	}
+	
 	kfree(options);
 
 	/* recover broken superblock */
@@ -2982,10 +3037,6 @@ skip_recovery:
 	f2fs_update_time(sbi, REQ_TIME);
 
 
-	pr_notice("before mdelay\n");
-	mdelay(10000);
-	
-	
 	return 0;
 
 free_meta:

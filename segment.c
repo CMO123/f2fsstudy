@@ -2736,7 +2736,8 @@ static void do_write_page(struct f2fs_summary *sum, struct f2fs_io_info *fio)
 {
 	int type = __get_segment_type(fio);
 	int err;
-
+	
+	pr_notice("Enter do_write_page()\n");
 reallocate:
 	allocate_data_block(fio->sbi, fio->page, fio->old_blkaddr,
 			&fio->new_blkaddr, sum, type, fio, true);
@@ -2747,6 +2748,7 @@ reallocate:
 		fio->old_blkaddr = fio->new_blkaddr;
 		goto reallocate;
 	} else if (!err) {
+		pr_notice("End do_write_page(), no err\n");
 		update_device_state(fio);
 	}
 }
@@ -2797,7 +2799,7 @@ void write_data_page(struct dnode_of_data *dn, struct f2fs_io_info *fio)
 	struct f2fs_sb_info *sbi = fio->sbi;
 	struct f2fs_summary sum;
 	struct node_info ni;
-
+pr_notice("Enter write_data_page()\n");
 	f2fs_bug_on(sbi, dn->data_blkaddr == NULL_ADDR);
 	get_node_info(sbi, dn->nid, &ni);
 	set_summary(&sum, dn->nid, dn->ofs_in_node, ni.version);
@@ -2805,6 +2807,7 @@ void write_data_page(struct dnode_of_data *dn, struct f2fs_io_info *fio)
 	f2fs_update_data_blkaddr(dn, fio->new_blkaddr);
 
 	f2fs_update_iostat(sbi, fio->io_type, F2FS_BLKSIZE);
+pr_notice("End write_data_page()\n");
 }
 
 int rewrite_data_page(struct f2fs_io_info *fio)

@@ -850,7 +850,8 @@ static inline unsigned int amf_get_secs(struct bio *bio)
 	return  bio->bi_iter.bi_size / F2FS_BLKSIZE;
 }
 /*这两个是main area的数据读写*/
-void amf_submit_bio_read (struct f2fs_sb_info* sbi, struct bio* bio)
+
+void amf_submit_bio_read_async (struct f2fs_sb_info* sbi, struct bio* bio)
 {
 	struct nvm_tgt_dev *dev = sbi->s_lightpblk->tgt_dev;
 	struct block_device* bdev = sbi->sb->s_bdev;
@@ -861,12 +862,11 @@ void amf_submit_bio_read (struct f2fs_sb_info* sbi, struct bio* bio)
 	int i, j =0;
 	int ret = NVM_IO_ERR;
 
-
+pr_notice("amf_submit_bio_read()\n");
 	/*设置rqd*/
 	rqd = kzalloc(sizeof(struct nvm_rq), GFP_KERNEL);
 	rqd->dev = dev;
 	rqd->opcode = NVM_OP_PREAD;
-	bio_get(bio);
 	 
 	rqd->bio = bio;
 	rqd->nr_ppas = nr_secs;
@@ -888,7 +888,7 @@ void amf_submit_bio_read (struct f2fs_sb_info* sbi, struct bio* bio)
 
 		for(i = 0; i < nr_secs; i++){
 			rqd->ppa_list[j++] = addr_ppa32_to_ppa64(sbi, lblkaddr+i);
-			pr_notice("rqd->ppa_list = 0x%llx\n", rqd->ppa_list[j-1]);
+			//pr_notice("rqd->ppa_list = 0x%llx\n", rqd->ppa_list[j-1]);
 		}		
 		
 	}else{
@@ -902,15 +902,14 @@ void amf_submit_bio_read (struct f2fs_sb_info* sbi, struct bio* bio)
 	if(rqd->error){
 		pr_notice("amf: read error:%d\n", rqd->error);
 	}
-	if(ret == NVM_IO_DONE && bio_flagged(bio, BIO_CLONED))
-		bio_put(bio);
-	
+	if(ret == NVM_IO_DONE){
+		bio_endio(bio);
+		return NVM_IO_OK;
+	}
 	if(ret == NVM_IO_ERR){
 		pr_err("amf: read IO submission failed\n"); 
 		bio_io_error(bio);
 		return ret;
-	}else if(ret == NVM_IO_DONE){
-		bio_endio(bio);
 	}
 	
 	return NVM_IO_OK;	
@@ -921,6 +920,93 @@ fail_end_io:
 	kfree(rqd);
 	return ret;
 }
+/*这两个是main area的数据读写*/
+static int count = 0;
+void amf_submit_bio_read_sync (struct f2fs_sb_info* sbi, struct bio* bio)
+{
+	struct nvm_tgt_dev *dev = sbi->s_lightpblk->tgt_dev;
+	struct block_device* bdev = sbi->sb->s_bdev;
+	struct nvm_geo* geo = &dev->geo;
+	struct nvm_rq rqd;
+	uint32_t lblkaddr = amf_get_lba(bio);
+	unsigned int nr_secs = amf_get_secs(bio); 
+	int i, j =0;
+	int ret = NVM_IO_ERR;
+
+	//pr_notice("amf_submit_bio_read()\n");
+	/*设置rqd*/
+		
+	rqd.bio = bio;
+	
+	tgt_setup_r_rq(sbi, &rqd, nr_secs, tgt_end_io_read);
+	if (nr_secs > 1) {
+		for(i = 0; i < nr_secs; i++){
+			rqd.ppa_list[j++] = addr_ppa32_to_ppa64(sbi, lblkaddr+i);
+			//pr_notice("rqd->ppa_list = 0x%llx\n", rqd->ppa_list[j-1]);
+		}		
+		
+	}else{
+		rqd.ppa_addr = addr_ppa32_to_ppa64(sbi, lblkaddr);
+		//pr_notice("rqd.ppa_addr = 0x%llx\n", rqd.ppa_addr);
+	}
+
+	ret = nvm_submit_io_sync(dev, &rqd);
+	/*pr_notice("rqd.bio.bi_status = %d\n",rqd.bio->bi_status);
+	pr_notice("count = %d\n",++count);
+	pr_notice("ret = %d\n",ret);
+	pr_notice("rqd.error = %d\n", rqd.error);
+	*/
+	if(ret){
+		pr_err("amf: emeta I/O submission failed: %d\n", ret);
+		bio_put(bio);
+		goto free_rqd_dma;			
+	}
+	
+free_rqd_dma:
+	nvm_dev_dma_free(dev->parent, rqd.meta_list, rqd.dma_meta_list);
+	return ret;
+}
+void amf_submit_bio_write_sync(struct f2fs_sb_info* sbi, struct bio* bio)
+{
+	struct nvm_tgt_dev* dev = sbi->s_lightpblk->tgt_dev;
+	unsigned int nr_secs = amf_get_secs(bio);
+	uint32_t lblkaddr = amf_get_lba(bio);
+	int i,j=0;
+	struct nvm_rq rqd;
+	int ret;
+
+pr_notice("Enter amf_submit_bio_write_sync(), lblkaddr = %d, nr_secs = %d\n", lblkaddr, nr_secs);
+retry:	
+	/*创建rqd*/
+	rqd.bio = bio;
+	ret = tgt_setup_w_rq(sbi,&rqd, nr_secs, NULL);
+	
+	//rqd->ppa_list[0] = addr_to_gen_ppa(sbi, pblkaddr);
+	if(nr_secs > 1){
+		for(i = 0; i < nr_secs; i++){
+		rqd.ppa_list[j++] = addr_ppa32_to_ppa64(sbi, lblkaddr+i);
+		pr_notice("lblkaddr = %d ==> rqd->ppa_list[j] = %d \n", lblkaddr+i, rqd.ppa_list[j-1]);
+		}
+	}else{
+		rqd.ppa_addr = addr_ppa32_to_ppa64(sbi, lblkaddr);
+		pr_notice("lblkaddr = %d ==> rqd->ppa_addr = %d \n", lblkaddr, rqd.ppa_addr);
+	}	
+	pr_notice("before nvm_submit_io_sync()\n");
+
+	ret = nvm_submit_io_sync(dev, &rqd);
+	if(ret){
+		pr_err("amf: amf_submit_bio_write failed:%d\n",ret);
+		bio_put(bio);
+		goto free_ppa_list;
+	}
+
+pr_notice("End amf_submit_bio_write_sync(), ret = %d\n",ret);
+free_ppa_list:
+	nvm_dev_dma_free(dev->parent, rqd.meta_list, rqd.dma_meta_list);
+	return ret;
+	
+}
+
 void amf_submit_bio_write(struct f2fs_sb_info* sbi, struct bio* bio)
 {
 	struct nvm_tgt_dev* dev = sbi->s_lightpblk->tgt_dev;
@@ -930,6 +1016,7 @@ void amf_submit_bio_write(struct f2fs_sb_info* sbi, struct bio* bio)
 	struct nvm_rq* rqd;
 	int ret;
 
+pr_notice("Enter amf_submit_bio_write(), lblkaddr = %d, nr_secs = %d\n", lblkaddr, nr_secs);
 retry:	
 	/*创建rqd*/
 	rqd = kzalloc(sizeof(struct nvm_rq),GFP_KERNEL);
@@ -937,6 +1024,7 @@ retry:
 		cond_resched();
 		goto retry;
 	}
+	//bio->bi_status = 0;
 	rqd->bio = bio;
 	ret = tgt_setup_w_rq(sbi,rqd, nr_secs, tgt_end_io_write);
 	
@@ -944,12 +1032,21 @@ retry:
 	if(nr_secs > 1){
 		for(i = 0; i < nr_secs; i++){
 		rqd->ppa_list[j++] = addr_ppa32_to_ppa64(sbi, lblkaddr+i);
+		pr_notice("lblkaddr = %d ==> rqd->ppa_list[j] = %d \n", lblkaddr+i, rqd->ppa_list[j-1]);
 		}
 	}else{
 		rqd->ppa_addr = addr_ppa32_to_ppa64(sbi, lblkaddr);
+		pr_notice("lblkaddr = %d ==> rqd->ppa_addr = %d \n", lblkaddr, rqd->ppa_addr);
 	}	
-	bio_get(bio);
-	return nvm_submit_io(dev, rqd);
+	pr_notice("before nvm_submit_io()\n");
+
+	ret = nvm_submit_io(dev, rqd);
+	if(ret){
+		pr_err("amf: amf_submit_bio_write failed:%d\n",ret);
+	}
+
+pr_notice("End amf_submit_bio_write(), ret = %d\n",ret);
+	
 }
 
 /*
@@ -961,7 +1058,7 @@ void amf_submit_bio_meta_w (struct f2fs_sb_info* sbi, struct bio* bio)
 		struct page* dst_page = NULL;
 		struct bio_vec bvec;
 		bool sync = op_is_sync(bio_op(bio));
-
+pr_notice("Enter amf_submit_bio_meta_w(), lblk = %d, nr_sec = %d\n", amf_get_lba(bio),amf_get_secs(bio));
 		uint8_t* src_page_addr = NULL;
 		uint8_t* dst_page_addr = NULL;
 		struct bvec_iter bioloop;
@@ -1012,17 +1109,22 @@ void amf_submit_bio_meta_w (struct f2fs_sb_info* sbi, struct bio* bio)
 			src_page_addr = (uint8_t*)page_address (src_page);
 			dst_page_addr = (uint8_t*)page_address (dst_page);
 			memcpy (dst_page_addr, src_page_addr, PAGE_SIZE);
+
+			pr_notice("before submit_page_write(), lblkaddr = %d ==> pblkaddr = %d \n", lblkaddr, pblkaddr);
+			//mdelay(6000);
 	
-			if (tgt_submit_page_write(sbi, dst_page, pblkaddr, sync) != 0) {
+			if (tgt_submit_page_write(sbi, dst_page, pblkaddr, 1) != 0) {
 				amf_dbg_msg ("amf_write_page_flash failed");
 				ret = -1;
 				goto out;
 			}
 		}
-	
+pr_notice("End amf_submit_bio_meta_w() ret = %d\n",ret);
+		//mdelay(6000);
 	out:
 		if (ret == 0) {
 			//set_bit (BIO_UPTODATE, &bio->bi_flags);
+			bio->bi_status = 0;
 			bio->bi_end_io (bio);
 		} else {
 			bio->bi_end_io (bio);
@@ -1039,7 +1141,7 @@ void amf_submit_bio_meta_r (struct f2fs_sb_info* sbi, struct bio* bio)
 	uint8_t* dst_page_addr = NULL;
 	struct bvec_iter bioloop;
 	int8_t ret = 0;
-pr_notice("Enter amf_submit_bio_meta_r()\n");
+//pr_notice("Enter amf_submit_bio_meta_r()\n");
 	src_page = alloc_page (GFP_NOFS | __GFP_ZERO);
 	if (IS_ERR (src_page)) {
 		amf_dbg_msg ("Errors occur while allocating page");
@@ -1069,7 +1171,7 @@ pr_notice("Enter amf_submit_bio_meta_r()\n");
 			ret = -1;
 			goto out;
 		}
-pr_notice("lblkaddr = %d ==> pblkaddr = %d\n", lblkaddr, pblkaddr);
+		//pr_notice("lblkaddr = %d ==> pblkaddr = %d\n", lblkaddr, pblkaddr);
 
 		/* read the requested page */
 		if (tgt_submit_page_read_sync(sbi, src_page, pblkaddr) != 0) {
@@ -1091,10 +1193,11 @@ out:
 	/* unlock & free the page */
 	unlock_page (src_page);
 	__free_pages (src_page, 0);
-pr_notice("End amf_submit_bio_meta_r()\n");
+
 
 	if (ret == 0) {
-		//bio_clear_flag(bio, BIO_TRACE_COMPLETION);		
+		//bio_clear_flag(bio, BIO_TRACE_COMPLETION);	
+		//pr_notice("invoke bio->bi_end_io()\n");
 		bio->bi_end_io (bio);
 	} else {
 		bio->bi_end_io (bio);
@@ -1107,7 +1210,7 @@ void amf_submit_bio (struct f2fs_sb_info* sbi, struct bio * bio, enum page_type 
 	block_t lblkaddr = amf_get_lba(bio) ;
 
 	if (amf_is_cp_blk (sbi, lblkaddr)) {
-amf_dbg_msg("lblkaddr = %d enter amf_is_cp_blk()\n", lblkaddr);
+	amf_dbg_msg("lblkaddr = %d enter amf_is_cp_blk()\n", lblkaddr);
 		amf_write_mapping_entries (sbi);
 #ifdef AMF_PMU
 			atomic64_inc (&sbi->pmu.ckp_w);
@@ -1115,7 +1218,7 @@ amf_dbg_msg("lblkaddr = %d enter amf_is_cp_blk()\n", lblkaddr);
 	}
 
 	if (is_valid_meta_lblkaddr (sbi, lblkaddr) == 0) {
-		pr_notice("is_valid_meta_lblkaddr() is true\n");
+		//pr_notice("is_valid_meta_lblkaddr() is true\n");
 		if (op_is_write(bio_op(bio))) {//write
 #ifdef AMF_PMU
 			atomic64_add(bio_sectors (bio) / 8, &sbi->pmu.meta_w);
@@ -1182,7 +1285,7 @@ submit_io:
 	
 #ifdef AMF_META_LOGGING
 		if(is_read_io(bio_op(bio))){
-			amf_submit_bio_read(sbi, bio);
+			amf_submit_bio_read_sync(sbi, bio);
 		}else{
 			amf_submit_bio_write(sbi, bio);			
 		}
@@ -1216,7 +1319,7 @@ int32_t get_metalog_free_blks (struct f2fs_sb_info* sbi)
 			ri->metalog_gc_sblkofs, ri->metalog_gc_eblkofs);
 		nr_free_blks = -1;
 	}
-
+//pr_notice("nr_free_blks = %d\n",nr_free_blks);
 	return nr_free_blks;
 }
 
@@ -1224,7 +1327,6 @@ int32_t get_metalog_free_blks (struct f2fs_sb_info* sbi)
 int8_t is_gc_needed (struct f2fs_sb_info* sbi, int32_t nr_free_blks)
 {
 	struct amf_info* ri = AMF_RI (sbi);
-
 	mutex_lock (&ri->amf_gc_mutex); 
 	if (nr_free_blks <= (sbi->segs_per_sec * sbi->blocks_per_seg)) {
 		mutex_unlock (&ri->amf_gc_mutex); 

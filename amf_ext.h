@@ -111,6 +111,7 @@ uint32_t amf_get_mapped_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr);
 uint32_t amf_get_new_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr, uint32_t length);
 
 int32_t get_metalog_free_blks (struct f2fs_sb_info* sbi);
+
 int8_t amf_map_l2p (struct f2fs_sb_info* sbi, block_t lblkaddr, block_t pblkaddr, uint32_t length);
 int8_t is_gc_needed (struct f2fs_sb_info* sbi, int32_t nr_free_blks);
 int8_t amf_do_gc (struct f2fs_sb_info* sbi);
@@ -123,6 +124,9 @@ int8_t amf_do_trim (struct f2fs_sb_info* sbi, block_t pblkaddr, uint32_t nr_blks
 int8_t amf_readpage (struct f2fs_sb_info* sbi, struct page* page, block_t pblkaddr);
 int8_t amf_writepage (struct f2fs_sb_info* sbi, struct page* page, block_t pblkaddr, uint8_t sync);
 void amf_submit_bio (struct f2fs_sb_info* sbi, struct bio * bio, enum page_type type);
+
+void amf_submit_bio_write_sync(struct f2fs_sb_info* sbi, struct bio* bio);
+void amf_submit_bio_write(struct f2fs_sb_info* sbi, struct bio* bio);
 
 
 #ifdef AMF_DRAM_META_LOGGING

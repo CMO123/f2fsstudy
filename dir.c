@@ -923,6 +923,7 @@ out_free:
 	fscrypt_fname_free_buffer(&fstr);
 out:
 	trace_f2fs_readdir(inode, start_pos, ctx->pos, err);
+	pr_notice("end f2fs_readdir(), err = %d\n",err);
 	return err < 0 ? err : 0;
 }
 

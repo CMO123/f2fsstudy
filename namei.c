@@ -16,6 +16,7 @@
 #include <linux/dcache.h>
 #include <linux/namei.h>
 #include <linux/quotaops.h>
+#include <linux/delay.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -190,7 +191,7 @@ static int f2fs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	struct inode *inode;
 	nid_t ino = 0;
 	int err;
-
+pr_notice("Enter f2fs_create()========\n");
 	if (unlikely(f2fs_cp_error(sbi)))
 		return -EIO;
 
@@ -212,8 +213,11 @@ static int f2fs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 
 	f2fs_lock_op(sbi);
 	err = f2fs_add_link(dentry, inode);
-	if (err)
+	if (err){
+		
 		goto out;
+	}
+		
 	f2fs_unlock_op(sbi);
 
 	alloc_nid_done(sbi, ino);
@@ -225,9 +229,14 @@ static int f2fs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 		f2fs_sync_fs(sbi->sb, 1);
 
 	f2fs_balance_fs(sbi, true);
+pr_notice("End f2fs_create()=============\n");
 	return 0;
 out:
 	handle_failed_inode(inode);
+	if(err){
+		pr_notice("err = %d\n",err);
+		mdelay(10000);
+	}
 	return err;
 }
 
@@ -564,18 +573,28 @@ static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	struct f2fs_sb_info *sbi = F2FS_I_SB(dir);
 	struct inode *inode;
 	int err;
-
-	if (unlikely(f2fs_cp_error(sbi)))
+pr_notice("Enter f2fs_mkdir()=========================\n");
+	if (unlikely(f2fs_cp_error(sbi))){
+		pr_notice("is f2fs_cp_error()\n");
 		return -EIO;
+	}
+	
 
 	err = dquot_initialize(dir);
-	if (err)
+	pr_notice("err1 = %d\n", err);
+	if (err){
+		mdelay(10000);
 		return err;
+	}
+	
 
 	inode = f2fs_new_inode(dir, S_IFDIR | mode);
-	if (IS_ERR(inode))
+	if (IS_ERR(inode)){
+		pr_notice("new_inode_error\n");
+		mdelay(10000);
 		return PTR_ERR(inode);
-
+	}
+	
 	inode->i_op = &f2fs_dir_inode_operations;
 	inode->i_fop = &f2fs_dir_operations;
 	inode->i_mapping->a_ops = &f2fs_dblock_aops;
@@ -584,8 +603,12 @@ static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	set_inode_flag(inode, FI_INC_LINK);
 	f2fs_lock_op(sbi);
 	err = f2fs_add_link(dentry, inode);
-	if (err)
+pr_notice("err = %d\n",err);
+	if (err){
+		mdelay(10000);
 		goto out_fail;
+	}
+		
 	f2fs_unlock_op(sbi);
 
 	alloc_nid_done(sbi, inode->i_ino);
@@ -593,10 +616,15 @@ static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
 
-	if (IS_DIRSYNC(dir))
+	if (IS_DIRSYNC(dir)){
+		pr_notice("dir is dirsync");
 		f2fs_sync_fs(sbi->sb, 1);
+	}
+		
 
 	f2fs_balance_fs(sbi, true);
+	pr_notice("end f2fs_mkdir()=================\n");
+	
 	return 0;
 
 out_fail:

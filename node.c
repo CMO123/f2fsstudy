@@ -1129,10 +1129,10 @@ static int read_node_page(struct page *page, int op_flags)
 
 	fio.new_blkaddr = fio.old_blkaddr = ni.blk_addr;
 
-	
+	 
 
 	int ret = f2fs_submit_page_bio(&fio);
-
+	 
 	return ret;
 }
 
@@ -1182,6 +1182,7 @@ repeat:
 	err = read_node_page(page, 0);
 	if (err < 0) {
 		f2fs_put_page(page, 1);
+		pr_notice("error: read_node_page, return ERR_PTR\n");
 		return ERR_PTR(err);
 	} else if (err == LOCKED_PAGE) {
 		err = 0;
@@ -1195,16 +1196,19 @@ repeat:
 
 	if (unlikely(page->mapping != NODE_MAPPING(sbi))) {
 		f2fs_put_page(page, 1);
+		pr_notice("error: page->mapping != NODE_MAPPING(sbi), repeat\n");
 		goto repeat;
 	}
 
 	if (unlikely(!PageUptodate(page))) {
 		err = -EIO;
+		pr_notice("error:!PageUptodate(page)), goto out_err\n");	
 		goto out_err;
 	}
 
 	if (!f2fs_inode_chksum_verify(sbi, page)) {
 		err = -EBADMSG;
+		pr_notice("error:f2fs_inode_chksum_verify, goto out_err\n");
 		goto out_err;
 	}
 page_hit:
@@ -1220,6 +1224,7 @@ out_err:
 		f2fs_put_page(page, 1);
 		return ERR_PTR(err);
 	}
+	pr_notice("End __get_node_page()\n");
 	return page;
 }
 
@@ -1580,7 +1585,8 @@ int sync_node_pages(struct f2fs_sb_info *sbi, struct writeback_control *wbc,
 	int nwritten = 0;
 	int ret = 0;
 	int nr_pages;
-
+	
+pr_notice("Enter sync_node_pages()\n");
 	pagevec_init(&pvec);
 
 next_step:
@@ -1710,16 +1716,23 @@ static int f2fs_write_node_pages(struct address_space *mapping,
 	struct f2fs_sb_info *sbi = F2FS_M_SB(mapping);
 	struct blk_plug plug;
 	long diff;
-
-	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING)))
+pr_notice("Enter f2fs_write_node_pages()==============wbc->nr_to_write = %lld,\n",wbc->nr_to_write);
+	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING))){
+		pr_notice("error: sbi_flag_set()\n");
 		goto skip_write;
+	}
+	
 
 	/* balancing f2fs's metadata in background */
 	f2fs_balance_fs_bg(sbi);
 
 	/* collect a number of dirty node pages and write together */
-	if (get_pages(sbi, F2FS_DIRTY_NODES) < nr_pages_to_skip(sbi, NODE))
+	if (get_pages(sbi, F2FS_DIRTY_NODES) < nr_pages_to_skip(sbi, NODE)){
+		pr_notice("get_pages(sbi, F2FS_DIRTY_NODES) = %d < nr_pages_to_skip(sbi, NODE) = %d \n",
+			get_pages(sbi, F2FS_DIRTY_NODES), nr_pages_to_skip(sbi, NODE));
 		goto skip_write;
+	}
+		
 
 	trace_f2fs_writepages(mapping->host, wbc, NODE);
 
@@ -1729,6 +1742,7 @@ static int f2fs_write_node_pages(struct address_space *mapping,
 	sync_node_pages(sbi, wbc, true, FS_NODE_IO);
 	blk_finish_plug(&plug);
 	wbc->nr_to_write = max((long)0, wbc->nr_to_write - diff);
+pr_notice("End f2fs_write_node_pages()============\n");
 	return 0;
 
 skip_write:

@@ -2861,6 +2861,8 @@ void f2fs_submit_merged_write_cond(struct f2fs_sb_info *sbi,
 				struct inode *inode, nid_t ino, pgoff_t idx,
 				enum page_type type);
 void f2fs_flush_merged_writes(struct f2fs_sb_info *sbi);
+
+
 int f2fs_submit_page_bio(struct f2fs_io_info *fio);
 
 int f2fs_submit_page_write(struct f2fs_io_info *fio);
@@ -2899,6 +2901,9 @@ int f2fs_release_page(struct page *page, gfp_t wait);
 int f2fs_migrate_page(struct address_space *mapping, struct page *newpage,
 			struct page *page, enum migrate_mode mode);
 #endif
+
+//amf add for test
+//static void f2fs_write_end_io(struct bio *bio);
 
 /*
  * gc.c

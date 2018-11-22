@@ -355,7 +355,7 @@ static inline void seg_info_from_raw_sit(struct seg_entry *se,
 	se->type = GET_SIT_TYPE(rs);
 	se->mtime = le64_to_cpu(rs->mtime);
 	
-	pr_notice("se->valid_blocks = %d, se->ckpt_valid_blocks= %d, se->type = %d\n",se->valid_blocks, se->ckpt_valid_blocks, se->type);//里面得到的都是0
+	//pr_notice("se->valid_blocks = %d, se->ckpt_valid_blocks= %d, se->type = %d\n",se->valid_blocks, se->ckpt_valid_blocks, se->type);//里面得到的都是0
 }
 
 static inline void __seg_info_to_raw_sit(struct seg_entry *se,
@@ -806,11 +806,16 @@ static inline int nr_pages_to_skip(struct f2fs_sb_info *sbi, int type)
 		return 0;
 
 	if (type == DATA)
-		return sbi->blocks_per_seg;
-	else if (type == NODE)
-		return 8 * sbi->blocks_per_seg;
+		return 32;
+		//return sbi->blocks_per_seg;
+	else if (type == NODE){
+		return 32;
+		//return 8 * sbi->blocks_per_seg;
+	}
+	
 	else if (type == META)
-		return 8 * BIO_MAX_PAGES;
+		return 32;
+	//return 8 * BIO_MAX_PAGES;
 	else
 		return 0;
 }
