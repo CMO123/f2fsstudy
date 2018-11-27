@@ -972,8 +972,8 @@ static void f2fs_put_super(struct super_block *sb)
 	f2fs_unregister_sysfs(sbi);
 
 #ifdef AMF_SNAPSHOT
-				amf_write_mapping_entries(sbi);
-				amf_destory_ri(sbi);
+	amf_write_mapping_entries(sbi);
+	amf_destory_ri(sbi);
 #endif
 
 
@@ -2716,14 +2716,24 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		}
 				
 			//修改core.c中nvm_create_tgt()
-			
+		/*
 		struct nvm_tgt_dev * a = sbi->s_lightpblk->tgt_dev;
 		pr_notice("tgt_dev的geo.nr_luns = 0x%x\n",a->geo.nr_luns);
 		pr_notice("tgt_dev的geo.all_luns = 0x%x\n",a->geo.all_luns);
 		int aret;
 		
-		/*
-		aret = tgt_submit_addr_erase_async(sbi, 545, 1);
+		
+		aret = tgt_mapping_erase(sbi, 545,1);
+		mdelay(5000);
+
+		struct page* bpage = alloc_page(GFP_NOFS | __GFP_ZERO);
+		//struct amf_map_blk* ptr_page_addr2 = (struct amf_map_blk*)page_address(bpage);
+		uint8_t* ptr_page_addr2 = (uint8_t*)page_address(bpage);
+		aret = tgt_submit_page_read_sync(sbi, bpage, 545);
+		//mdelay(10000);
+		pr_notice("ptr_page_addr2 = %d\n",*ptr_page_addr2);
+		//pr_notice("ptr_page_addr2->magic = %u, ptr_page_addr2->index = %u, ptr_page_addr2->mapping[0]=%u\n", ptr_page_addr2->magic, ptr_page_addr2->index, ptr_page_addr2->mapping[0]);
+		
 		
 		
 		struct page* apage = alloc_page(GFP_NOFS | __GFP_ZERO);
@@ -2733,16 +2743,21 @@ sbi->s_lightpblk = lightpblk_fs_create(sb, "mylightpblk");
 		aret = tgt_submit_page_write(sbi, apage,545,1);
 		//mdelay(10000);		
 		
-		struct page* bpage = alloc_page(GFP_NOFS | __GFP_ZERO);
-		//struct amf_map_blk* ptr_page_addr2 = (struct amf_map_blk*)page_address(bpage);
-		uint8_t* ptr_page_addr2 = (uint8_t*)page_address(bpage);
+		//struct page* bpage = alloc_page(GFP_NOFS | __GFP_ZERO);
+		//uint8_t* ptr_page_addr2 = (uint8_t*)page_address(bpage);
 		aret = tgt_submit_page_read_sync(sbi, bpage, 545);
 		//mdelay(10000);
 		pr_notice("ptr_page_addr2 = %d\n",*ptr_page_addr2);
 		//pr_notice("ptr_page_addr2->magic = %u, ptr_page_addr2->index = %u, ptr_page_addr2->mapping[0]=%u\n", ptr_page_addr2->magic, ptr_page_addr2->index, ptr_page_addr2->mapping[0]);
-		mdelay(10000);
-		*/
 
+
+		aret = tgt_mapping_erase(sbi, 545, 1);
+		mdelay(5000);
+		aret = tgt_submit_page_read_sync(sbi, bpage, 545);
+		pr_notice("ptr_page_addr2 = %d\n",*ptr_page_addr2);
+		mdelay(10000);
+	
+*/
 /*
 		struct bio* bio = f2fs_bio_alloc(sbi, 1, true);
 		f2fs_target_device(sbi, 59422, bio);

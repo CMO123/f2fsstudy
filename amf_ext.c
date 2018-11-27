@@ -317,24 +317,31 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 	amf_msg (" * mapping table blkaddr: %u (blk)", ri->mapping_blkofs);
 	amf_msg (" * mapping table length: %u (blk)", ri->nr_mapping_phys_blks);
 
+	//mdelay(5000);
 	/* allocate the memory space for the summary table */
 	if ((ri->map_blks = (struct amf_map_blk*)kmalloc (
 			sizeof (struct amf_map_blk) * ri->nr_mapping_logi_blks, GFP_KERNEL)) == NULL) {
 		amf_dbg_msg ("Errors occur while allocating memory space for the mapping table");
+		mdelay(10000);
 		goto out;
 	}
 	memset (ri->map_blks, 0x00, sizeof (struct amf_map_blk) * ri->nr_mapping_logi_blks);
-			
+	//pr_notice("create ri->map_blks\n");
+	//mdelay(5000);		
 	/* get the free page from the memory pool */
 	page = alloc_page (GFP_NOFS | __GFP_ZERO);
 	if (IS_ERR (page)) {
 		amf_dbg_msg ("Errors occur while allocating page");
+		mdelay(10000);
 		kfree (ri->map_blks);
 		ret = PTR_ERR (page);
 		goto out;
 	}
 	lock_page (page);
 
+	//pr_notice("alloc_page\n");
+	//mdelay(5000);
+	
 	/* read the mapping info from the disk */
 	ri->mapping_gc_sblkofs = -1;
 	ri->mapping_gc_eblkofs = -1;
@@ -386,9 +393,10 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 			}
 		
 			/* goto the next page */
-			//ClearPageUptodate (page);
+			ClearPageUptodate (page);
 		}
-
+	//	pr_notice("End submit()\n");
+	//	mdelay(5000);
 		/* is it dead? */
 		if (is_dead_section == 1) {//如果第i个section是dead的
 			printk (KERN_INFO "dead section detected: %u\n", i);
@@ -398,13 +406,15 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 				ri->mapping_gc_sblkofs = ri->mapping_gc_sblkofs % ri->nr_mapping_phys_blks;
 				//amf_do_trim (sbi, ri->mapping_blkofs + ri->mapping_gc_eblkofs, ri->blks_per_sec); 
 				//f2fs_issue_discard(sbi, ri->mapping_blkofs + ri->mapping_gc_eblkofs, ri->blks_per_sec);
-				tgt_submit_addr_erase_async(sbi, ri->mapping_blkofs + ri->mapping_gc_eblkofs, ri->blks_per_sec);
+				tgt_mapping_erase(sbi, ri->mapping_blkofs + ri->mapping_gc_eblkofs, ri->blks_per_sec);
 				//mdelay(10000);
 				
 			}
 		}
 		//mdelay(10000);
 	}
+	//pr_notice("End is_dead_section()\n");
+	//		mdelay(5000);
 
 	/* is there a free section for the mapping table? */
 	if (ri->mapping_gc_sblkofs == -1 || ri->mapping_gc_eblkofs == -1) {
@@ -425,12 +435,13 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 	*/
 
 out:
+	//	pr_notice("End out\n");
+	//	mdelay(5000);
+
 	/* unlock & free the page */
 	unlock_page (page);
 	__free_pages (page, 0);
 	
-	//pr_notice("create_metalog_mapping is ok!\n");
-	//mdelay(20000);
 	return ret;
 }
 
@@ -440,7 +451,6 @@ out:
  */
 int32_t amf_create_ri (struct f2fs_sb_info* sbi)
 {
-pr_notice("Enter amf_create_ri()\n");
 	struct amf_info* ri = NULL;
 	uint32_t nr_logi_metalog_segments = 0;
 	uint32_t nr_phys_metalog_segments = 0;
@@ -484,7 +494,7 @@ pr_notice("Enter amf_create_ri()\n");
 	amf_msg (" * the range of physical meta address: %u - %u", 
 		ri->metalog_blkofs, ri->metalog_blkofs + ri->nr_metalog_phys_blks);
 
-pr_notice("Exit amf_create_ri()\n");
+
 	return 0;
 }
 
@@ -523,7 +533,7 @@ int32_t amf_build_ri (struct f2fs_sb_info *sbi)
 	}
 	
 #endif
-amf_dbg_msg("End amf_build_ri()\n");
+
 
 	return 0;
 
@@ -578,7 +588,7 @@ int8_t is_mapping_gc_needed (struct f2fs_sb_info* sbi, int32_t nr_free_blks)
 int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 {
 	struct amf_info* ri = AMF_RI (sbi);
-
+	int ret;
 	
 	amf_dbg_msg ("before gc");
 	amf_msg ("-------------------------------");
@@ -592,7 +602,7 @@ int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 	/* perform gc */
 	//risa_do_trim (sbi, ri->mapping_blkofs + ri->mapping_gc_sblkofs, ri->blks_per_sec); 
 	//f2fs_issue_discard(sbi,  ri->mapping_blkofs + ri->mapping_gc_sblkofs,ri->blks_per_sec);
-	tgt_submit_addr_erase_async(sbi,  ri->mapping_blkofs + ri->mapping_gc_sblkofs,ri->blks_per_sec);
+	ret = tgt_mapping_erase(sbi,  ri->mapping_blkofs + ri->mapping_gc_sblkofs,ri->blks_per_sec);
 	/* advance 'mapping_gc_sblkofs' */
 	ri->mapping_gc_sblkofs = (ri->mapping_gc_sblkofs + ri->blks_per_sec) % 
 		ri->nr_mapping_phys_blks;
@@ -657,7 +667,7 @@ int32_t amf_write_mapping_entries (struct f2fs_sb_info* sbi)
 		/*risa_writepage_flash (sbi, page, ri->mapping_blkofs + ri->mapping_gc_eblkofs, 1);*/
 		//risa_writepage_flash (sbi, page, ri->mapping_blkofs + ri->mapping_gc_eblkofs, 0);
 		//write_meta_page(sbi, page,FS_META_IO);
-		tgt_submit_page_write_async(sbi, page, ri->mapping_blkofs + ri->mapping_gc_eblkofs);
+		tgt_submit_page_write_sync(sbi, page, ri->mapping_blkofs + ri->mapping_gc_eblkofs);
 
 		/* update physical location */
 		ri->mapping_gc_eblkofs = 
@@ -665,7 +675,7 @@ int32_t amf_write_mapping_entries (struct f2fs_sb_info* sbi)
 
 		atomic64_add (1, &sbi->pmu.mapping_w);
 	}
-pr_notice("end amf_write_mapping_entires()\n");
+
 
 	return 0;
 }

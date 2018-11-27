@@ -31,7 +31,7 @@ int timeval_subtract (
 
 void amf_pmu_create (struct f2fs_sb_info *sbi)
 {
-pr_notice("Enter amf_pmu_create()\n");
+
 	atomic64_set (&sbi->pmu.norm_r, 0);
 	atomic64_set (&sbi->pmu.norm_w, 0);
 	atomic64_set (&sbi->pmu.meta_r, 0);
@@ -42,7 +42,7 @@ pr_notice("Enter amf_pmu_create()\n");
 	atomic64_set (&sbi->pmu.time_norm_r, 0);
 	atomic64_set (&sbi->pmu.time_norm_w, 0);
 	atomic64_set (&sbi->pmu.ckp_w, 0);
-pr_notice("end amf_pmu_create()\n");
+
 	do_gettimeofday (&sbi->pmu.time_start);
 	/*return tv.tv_sec * 1000000 + tv.tv_usec;*/
 }

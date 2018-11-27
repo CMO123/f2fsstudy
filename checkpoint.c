@@ -77,7 +77,7 @@ static struct page *__get_meta_page(struct f2fs_sb_info *sbi, pgoff_t index,
 	if (unlikely(!is_meta))
 		fio.op_flags &= ~REQ_META;
 repeat:
-pr_notice("__get_meta_page, index = %d\n", index);
+//pr_notice("__get_meta_page, index = %d\n", index);
 	page = f2fs_grab_cache_page(mapping, index, false);//获取或创建一个page
 	if (!page) {
 		cond_resched();
@@ -1218,7 +1218,7 @@ static int do_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	u64 kbytes_written;
 	int err;
 pr_notice("Enter do_checkpoint()============\n");
-mdelay(10000);
+//mdelay(10000);
 	/* Flush all the NAT/SIT pages */
 	while (get_pages(sbi, F2FS_DIRTY_META)) {
 		sync_meta_pages(sbi, META, LONG_MAX, FS_CP_META_IO);

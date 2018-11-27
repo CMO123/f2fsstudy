@@ -407,9 +407,7 @@ static inline u32 tgt_ppa64_to_ppa32(struct lightpblk *alightpblk, struct ppa_ad
 
 static void tgt_end_io_write(struct nvm_rq* rqd)
 {
-	struct bio* bio = rqd->bio;
-	bio_put(bio);
-
+	
 	nvm_dev_dma_free(rqd->dev->parent, rqd->meta_list, rqd->dma_meta_list);
 	kfree(rqd);
 	
@@ -419,7 +417,7 @@ static void tgt_end_io_erase(struct nvm_rq* rqd)
 {
 	//return NULL;
 	
-	struct bio* bio = rqd->bio;
+	
 	pr_notice("=====================Enter tgt_end_io_erase()\n");
 	pr_notice("rqd->ppa_addr.ppa = 0x%llx\n", rqd->ppa_addr.ppa);
 	kfree(rqd);
@@ -705,6 +703,29 @@ static int tgt_submit_addr_erase_async(struct f2fs_sb_info* sbi, block_t paddr, 
 	return ret;
 }
 
+static int tgt_mapping_erase(struct f2fs_sb_info* sbi, block_t paddr, uint32_t nr_blks){
+	struct page* zero_page = alloc_page(GFP_NOFS | __GFP_ZERO);
+	int ret = 0;
+	int i;
+	
+	uint8_t* ptr_page_addr = (uint8_t*)page_address(zero_page);
+	lock_page (zero_page);
+	memset(ptr_page_addr,0,PAGE_SIZE);
+
+	for(i = 0; i < nr_blks; i++){		
+		ret = tgt_submit_page_write(sbi, zero_page, paddr+i, 0);
+		if(ret){
+		pr_notice("Error: tgt_mapping_erase() error\n");
+		return ret;
+		}
+	}
+	unlock_page (zero_page);
+	__free_pages (zero_page, 0);
+	
+	ret = tgt_submit_addr_erase_async(sbi, paddr, nr_blks);
+	return ret;
+
+}
 
 static int tgt_submit_page_read_sync(struct f2fs_sb_info *sbi, struct page* page, block_t paddr)
 {
