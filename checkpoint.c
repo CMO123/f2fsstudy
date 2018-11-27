@@ -29,8 +29,8 @@ struct kmem_cache *inode_entry_slab;
 
 void f2fs_stop_checkpoint(struct f2fs_sb_info *sbi, bool end_io)
 {
-pr_notice("f2fs_stop_checkpoint()\n");
-mdelay(10000);
+//pr_notice("f2fs_stop_checkpoint()\n");
+//mdelay(10000);
 	set_ckpt_flags(sbi, CP_ERROR_FLAG);
 	if (!end_io)
 		f2fs_flush_merged_writes(sbi);
@@ -642,11 +642,11 @@ int recover_orphan_inodes(struct f2fs_sb_info *sbi)
 	quota_enabled = f2fs_enable_quota_files(sbi, s_flags & SB_RDONLY);
 #endif
 
-pr_notice("Enter recover_orphan_inode()---------------- \n");
+//pr_notice("Enter recover_orphan_inode()---------------- \n");
 	start_blk = __start_cp_addr(sbi) + 1 + __cp_payload(sbi);//0x201
 	orphan_blocks = __start_sum_addr(sbi) - 1 - __cp_payload(sbi);//0x0, start_sum_addr = 0x1, __cp_payload = 0
 
-	pr_notice("start_blk = 0x%x, orphan_blocks = 0x%x\n", start_blk, orphan_blocks);
+	//pr_notice("start_blk = 0x%x, orphan_blocks = 0x%x\n", start_blk, orphan_blocks);
 	
 	ra_meta_pages(sbi, start_blk, orphan_blocks, META_CP, true);
 
@@ -762,7 +762,7 @@ static int get_checkpoint_version(struct f2fs_sb_info *sbi, block_t cp_addr,
 	}
 
 	*version = cur_cp_version(*cp_block);
-	pr_notice("version = 0x%llx\n", *version);//0x214e9bbd
+	//pr_notice("version = 0x%llx\n", *version);//0x214e9bbd
 	return 0;
 }
 
@@ -837,7 +837,7 @@ int get_valid_checkpoint(struct f2fs_sb_info *sbi)
 	cp_start_blk_no = le32_to_cpu(fsb->cp_blkaddr);
 	//f2fs:get_valid_checkpoint:808: cp_start_blk_no = 0x200
 	//cp_start_blk_no =  2049;
-pr_notice("checkpoint1的起始地址，cp_start_blk_no1 = 0x%llx =============================\n",cp_start_blk_no);
+//pr_notice("checkpoint1的起始地址，cp_start_blk_no1 = 0x%llx =============================\n",cp_start_blk_no);
 	
 	cp1 = validate_checkpoint(sbi, cp_start_blk_no, &cp1_version);//根据checkpoint起始地址，得到checkpoint1中最新版本
 //pr_notice("cp1_version = %d\n",cp1);
@@ -848,7 +848,7 @@ pr_notice("checkpoint1的起始地址，cp_start_blk_no1 = 0x%llx ==============
 				le32_to_cpu(fsb->log_blocks_per_seg);
 	//cp_start_blk_no = 2056;
 	
-pr_notice("checkpoint2的起始地址，cp_start_blk_no2 = 0x%llx==========================\n",cp_start_blk_no);//2056
+//pr_notice("checkpoint2的起始地址，cp_start_blk_no2 = 0x%llx==========================\n",cp_start_blk_no);//2056
 	cp2 = validate_checkpoint(sbi, cp_start_blk_no, &cp2_version);
 
 	if (cp1 && cp2) {
@@ -857,7 +857,7 @@ pr_notice("checkpoint2的起始地址，cp_start_blk_no2 = 0x%llx===============
 		else
 			cur_page = cp1;
 	} else if (cp1) {
-	pr_notice("cp1 is valid!\n");
+//	pr_notice("cp1 is valid!\n");
 		cur_page = cp1;
 	} else if (cp2) {
 		cur_page = cp2;
@@ -1419,9 +1419,9 @@ int write_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 
 	trace_f2fs_write_checkpoint(sbi->sb, cpc->reason, "finish block_ops");
 
-	pr_notice("before f2fs_flush_merged_writes()\n");
+	//pr_notice("before f2fs_flush_merged_writes()\n");
 	f2fs_flush_merged_writes(sbi);
-	pr_notice("end f2fs_flush_merged_writes()\n");
+	//pr_notice("end f2fs_flush_merged_writes()\n");
 
 	/* this is the case of multiple fstrims without any changes */
 	if (cpc->reason & CP_DISCARD) {

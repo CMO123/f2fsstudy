@@ -937,7 +937,7 @@ static void f2fs_put_super(struct super_block *sb)
 		struct cp_control cpc = {
 			.reason = CP_UMOUNT | CP_TRIMMED,
 		};
-	pr_notice("Enter this2?\n");//enter
+	//pr_notice("Enter this2?\n");//enter
 		write_checkpoint(sbi, &cpc);
 	}
 
@@ -1000,7 +1000,7 @@ int f2fs_sync_fs(struct super_block *sb, int sync)
 	struct f2fs_sb_info *sbi = F2FS_SB(sb);
 	int err = 0;
 
-pr_notice("Enter f2fs_sync_fs()\n");
+//pr_notice("Enter f2fs_sync_fs()\n");
 	if (unlikely(f2fs_cp_error(sbi)))
 		return 0;
 
@@ -1019,7 +1019,7 @@ pr_notice("Enter f2fs_sync_fs()\n");
 		mutex_unlock(&sbi->gc_mutex);
 	}
 	f2fs_trace_ios(NULL, 1);
-pr_notice("End f2fs_sync_fs(), err = %d\n",err);
+//pr_notice("End f2fs_sync_fs(), err = %d\n",err);
 	return err;
 }
 
@@ -2196,9 +2196,9 @@ static void init_sb_info(struct f2fs_sb_info *sbi)
 	sbi->max_victim_search = DEF_MAX_VICTIM_SEARCH;
 
 	sbi->dir_level = DEF_DIR_LEVEL;
-	//sbi->interval_time[CP_TIME] = DEF_CP_INTERVAL;
-	sbi->interval_time[CP_TIME] = 6000;
-pr_notice("cp_time = %d(s)\n", sbi->interval_time[CP_TIME]);
+	sbi->interval_time[CP_TIME] = DEF_CP_INTERVAL;
+	//sbi->interval_time[CP_TIME] = 6000;
+//pr_notice("cp_time = %d(s)\n", sbi->interval_time[CP_TIME]);
 	sbi->interval_time[REQ_TIME] = DEF_IDLE_INTERVAL;
 	clear_sbi_flag(sbi, SBI_NEED_FSCK);
 
@@ -2327,7 +2327,7 @@ static int read_raw_super_block(struct f2fs_sb_info *sbi,
 	struct buffer_head *bh;
 	struct f2fs_super_block *super;
 	int err = 0;
-pr_notice("Enter read_raw_super_block()\n");
+//pr_notice("Enter read_raw_super_block()\n");
 	super = kzalloc(sizeof(struct f2fs_super_block), GFP_KERNEL);
 	if (!super)
 		return -ENOMEM;

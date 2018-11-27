@@ -2737,7 +2737,7 @@ static void do_write_page(struct f2fs_summary *sum, struct f2fs_io_info *fio)
 	int type = __get_segment_type(fio);
 	int err;
 	
-	pr_notice("Enter do_write_page()\n");
+	//pr_notice("Enter do_write_page()\n");
 reallocate:
 	allocate_data_block(fio->sbi, fio->page, fio->old_blkaddr,
 			&fio->new_blkaddr, sum, type, fio, true);
@@ -2748,7 +2748,7 @@ reallocate:
 		fio->old_blkaddr = fio->new_blkaddr;
 		goto reallocate;
 	} else if (!err) {
-		pr_notice("End do_write_page(), no err\n");
+		//pr_notice("End do_write_page(), no err\n");
 		update_device_state(fio);
 	}
 }
@@ -2799,7 +2799,7 @@ void write_data_page(struct dnode_of_data *dn, struct f2fs_io_info *fio)
 	struct f2fs_sb_info *sbi = fio->sbi;
 	struct f2fs_summary sum;
 	struct node_info ni;
-pr_notice("Enter write_data_page()\n");
+//pr_notice("Enter write_data_page()\n");
 	f2fs_bug_on(sbi, dn->data_blkaddr == NULL_ADDR);
 	get_node_info(sbi, dn->nid, &ni);
 	set_summary(&sum, dn->nid, dn->ofs_in_node, ni.version);
@@ -2807,7 +2807,7 @@ pr_notice("Enter write_data_page()\n");
 	f2fs_update_data_blkaddr(dn, fio->new_blkaddr);
 
 	f2fs_update_iostat(sbi, fio->io_type, F2FS_BLKSIZE);
-pr_notice("End write_data_page()\n");
+//pr_notice("End write_data_page()\n");
 }
 
 int rewrite_data_page(struct f2fs_io_info *fio)
@@ -3031,7 +3031,7 @@ static int read_normal_summaries(struct f2fs_sb_info *sbi, int type)
 
 	/* get segment number and block addr */
 	if (IS_DATASEG(type)) {//如果是data summary
-pr_notice("type为data类型\n");
+//pr_notice("type为data类型\n");
 		segno = le32_to_cpu(ckpt->cur_data_segno[type]);
 		blk_off = le16_to_cpu(ckpt->cur_data_blkoff[type -
 							CURSEG_HOT_DATA]);
@@ -3042,12 +3042,12 @@ pr_notice("type为data类型\n");
 		else
 			blk_addr = sum_blk_addr(sbi, NR_CURSEG_DATA_TYPE, type);
 	} else {//如果是node summary
-pr_notice("type为node类型\n");
+//pr_notice("type为node类型\n");
 		segno = le32_to_cpu(ckpt->cur_node_segno[type -
 							CURSEG_HOT_NODE]);
 		blk_off = le16_to_cpu(ckpt->cur_node_blkoff[type -
 							CURSEG_HOT_NODE]);
-pr_notice("segno = 0x%x, blk_off = 0x%x\n",segno,blk_off);
+//pr_notice("segno = 0x%x, blk_off = 0x%x\n",segno,blk_off);
 		if (__exist_node_summaries(sbi))// true
 			blk_addr = sum_blk_addr(sbi, NR_CURSEG_NODE_TYPE,
 							type - CURSEG_HOT_NODE);// blk_addr = 0x202,0x203,0x204 = 514,515,516
@@ -3055,7 +3055,7 @@ pr_notice("segno = 0x%x, blk_off = 0x%x\n",segno,blk_off);
 			blk_addr = GET_SUM_BLOCK(sbi, segno);
 
 	}
-pr_notice("blk_addr = 0x%x\n", blk_addr);
+//pr_notice("blk_addr = 0x%x\n", blk_addr);
 	
 	new = get_meta_page(sbi, blk_addr);
 	sum = (struct f2fs_summary_block *)page_address(new);

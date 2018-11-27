@@ -191,7 +191,7 @@ static int f2fs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	struct inode *inode;
 	nid_t ino = 0;
 	int err;
-pr_notice("Enter f2fs_create()========\n");
+//pr_notice("Enter f2fs_create()========\n");
 	if (unlikely(f2fs_cp_error(sbi)))
 		return -EIO;
 
@@ -229,7 +229,7 @@ pr_notice("Enter f2fs_create()========\n");
 		f2fs_sync_fs(sbi->sb, 1);
 
 	f2fs_balance_fs(sbi, true);
-pr_notice("End f2fs_create()=============\n");
+//pr_notice("End f2fs_create()=============\n");
 	return 0;
 out:
 	handle_failed_inode(inode);
@@ -573,7 +573,7 @@ static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	struct f2fs_sb_info *sbi = F2FS_I_SB(dir);
 	struct inode *inode;
 	int err;
-pr_notice("Enter f2fs_mkdir()=========================\n");
+
 	if (unlikely(f2fs_cp_error(sbi))){
 		pr_notice("is f2fs_cp_error()\n");
 		return -EIO;
@@ -581,9 +581,8 @@ pr_notice("Enter f2fs_mkdir()=========================\n");
 	
 
 	err = dquot_initialize(dir);
-	pr_notice("err1 = %d\n", err);
+	//pr_notice("err1 = %d\n", err);
 	if (err){
-		mdelay(10000);
 		return err;
 	}
 	
@@ -591,7 +590,6 @@ pr_notice("Enter f2fs_mkdir()=========================\n");
 	inode = f2fs_new_inode(dir, S_IFDIR | mode);
 	if (IS_ERR(inode)){
 		pr_notice("new_inode_error\n");
-		mdelay(10000);
 		return PTR_ERR(inode);
 	}
 	
@@ -603,7 +601,6 @@ pr_notice("Enter f2fs_mkdir()=========================\n");
 	set_inode_flag(inode, FI_INC_LINK);
 	f2fs_lock_op(sbi);
 	err = f2fs_add_link(dentry, inode);
-pr_notice("err = %d\n",err);
 	if (err){
 		mdelay(10000);
 		goto out_fail;
@@ -623,7 +620,6 @@ pr_notice("err = %d\n",err);
 		
 
 	f2fs_balance_fs(sbi, true);
-	pr_notice("end f2fs_mkdir()=================\n");
 	
 	return 0;
 

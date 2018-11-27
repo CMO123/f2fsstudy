@@ -308,11 +308,11 @@ struct inode *f2fs_iget(struct super_block *sb, unsigned long ino)
 	struct inode *inode;
 	int ret = 0;
 
-pr_notice("Enter f2fs_iget(), ino = 0x%lx -------------------------------\n", ino);
+//pr_notice("Enter f2fs_iget(), ino = 0x%lx -------------------------------\n", ino);
 
 	inode = iget_locked(sb, ino);//从已挂载文件系统中获得ino的inode，如果没有则利用f2fs的alloc_inode重新分配一个，新的话带有标志I_NEW
 	//第一次在fill_super中调用创建sbi->meta_inode时，inode->i_state & I_NEW = 0x8, 是新创建的inode
-pr_notice("inode is newly create?? inode->i_state & I_NEW =0x%lx\n",inode->i_state & I_NEW);
+//pr_notice("inode is newly create?? inode->i_state & I_NEW =0x%lx\n",inode->i_state & I_NEW);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
 

@@ -862,7 +862,7 @@ static int f2fs_readdir(struct file *file, struct dir_context *ctx)
 	struct fscrypt_str fstr = FSTR_INIT(NULL, 0);
 	int err = 0;
 
-pr_notice("Enter f2fs_readdir()------------------------------------\n");
+//pr_notice("Enter f2fs_readdir()------------------------------------\n");
 
 	if (f2fs_encrypted_inode(inode)) {
 		err = fscrypt_get_encryption_info(inode);
@@ -923,7 +923,7 @@ out_free:
 	fscrypt_fname_free_buffer(&fstr);
 out:
 	trace_f2fs_readdir(inode, start_pos, ctx->pos, err);
-	pr_notice("end f2fs_readdir(), err = %d\n",err);
+	//pr_notice("end f2fs_readdir(), err = %d\n",err);
 	return err < 0 ? err : 0;
 }
 

@@ -573,7 +573,7 @@ int32_t get_mapping_free_blks (struct f2fs_sb_info* sbi)
 		nr_free_blks = -1;
 	}
 	
-pr_notice("get_mapping_free_blks() return nr_free_blks = %d\n", nr_free_blks);
+//pr_notice("get_mapping_free_blks() return nr_free_blks = %d\n", nr_free_blks);
 	return nr_free_blks;
 }
 
@@ -590,6 +590,7 @@ int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 	struct amf_info* ri = AMF_RI (sbi);
 	int ret;
 	
+	/*
 	amf_dbg_msg ("before gc");
 	amf_msg ("-------------------------------");
 	amf_msg ("ri->mapping_gc_slbkofs: %u (%u)", 
@@ -597,7 +598,7 @@ int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 	amf_msg ("ri->mapping_gc_eblkofs: %u (%u)", 
 		ri->mapping_gc_eblkofs, ri->mapping_blkofs + ri->mapping_gc_eblkofs);
 	amf_msg ("-------------------------------");
-	
+	*/
 
 	/* perform gc */
 	//risa_do_trim (sbi, ri->mapping_blkofs + ri->mapping_gc_sblkofs, ri->blks_per_sec); 
@@ -607,7 +608,7 @@ int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 	ri->mapping_gc_sblkofs = (ri->mapping_gc_sblkofs + ri->blks_per_sec) % 
 		ri->nr_mapping_phys_blks;
 
-	
+	/*
 	amf_dbg_msg ("after gc");
 	amf_msg ("-------------------------------");
 	amf_msg ("ri->mapping_gc_slbkofs: %u (%u)", 
@@ -615,7 +616,7 @@ int8_t amf_do_mapping_gc (struct f2fs_sb_info* sbi)
 	amf_msg ("ri->mapping_gc_eblkofs: %u (%u)", 
 		ri->mapping_gc_eblkofs, ri->mapping_blkofs + ri->mapping_gc_eblkofs);
 	amf_msg ("-------------------------------");
-	
+	*/
 
 	return 0;
 }
@@ -872,7 +873,7 @@ void amf_submit_bio_read_async (struct f2fs_sb_info* sbi, struct bio* bio)
 	int i, j =0;
 	int ret = NVM_IO_ERR;
 
-pr_notice("amf_submit_bio_read()\n");
+//pr_notice("amf_submit_bio_read()\n");
 	/*设置rqd*/
 	rqd = kzalloc(sizeof(struct nvm_rq), GFP_KERNEL);
 	rqd->dev = dev;
@@ -903,7 +904,7 @@ pr_notice("amf_submit_bio_read()\n");
 		
 	}else{
 		rqd->ppa_addr = addr_ppa32_to_ppa64(sbi, lblkaddr);
-		pr_notice("rqd->ppa_addr = 0x%llx\n", rqd->ppa_addr);
+		//pr_notice("rqd->ppa_addr = 0x%llx\n", rqd->ppa_addr);
 		rqd->flags = NVM_IO_SUSPEND | NVM_IO_SCRAMBLE_ENABLE;	
 	}
 
@@ -985,7 +986,7 @@ void amf_submit_bio_write_sync(struct f2fs_sb_info* sbi, struct bio* bio)
 	struct nvm_rq rqd;
 	int ret;
 
-pr_notice("Enter amf_submit_bio_write_sync(), lblkaddr = %d, nr_secs = %d\n", lblkaddr, nr_secs);
+//pr_notice("Enter amf_submit_bio_write_sync(), lblkaddr = %d, nr_secs = %d\n", lblkaddr, nr_secs);
 retry:	
 	/*创建rqd*/
 	rqd.bio = bio;
@@ -995,13 +996,13 @@ retry:
 	if(nr_secs > 1){
 		for(i = 0; i < nr_secs; i++){
 		rqd.ppa_list[j++] = addr_ppa32_to_ppa64(sbi, lblkaddr+i);
-		pr_notice("lblkaddr = %d ==> rqd->ppa_list[j] = %d \n", lblkaddr+i, rqd.ppa_list[j-1]);
+		//pr_notice("lblkaddr = %d ==> rqd->ppa_list[j] = %d \n", lblkaddr+i, rqd.ppa_list[j-1]);
 		}
 	}else{
 		rqd.ppa_addr = addr_ppa32_to_ppa64(sbi, lblkaddr);
-		pr_notice("lblkaddr = %d ==> rqd->ppa_addr = %d \n", lblkaddr, rqd.ppa_addr);
+		//pr_notice("lblkaddr = %d ==> rqd->ppa_addr = %d \n", lblkaddr, rqd.ppa_addr);
 	}	
-	pr_notice("before nvm_submit_io_sync()\n");
+	//pr_notice("before nvm_submit_io_sync()\n");
 
 	ret = nvm_submit_io_sync(dev, &rqd);
 	if(ret){
@@ -1010,7 +1011,7 @@ retry:
 		goto free_ppa_list;
 	}
 
-pr_notice("End amf_submit_bio_write_sync(), ret = %d\n",ret);
+//pr_notice("End amf_submit_bio_write_sync(), ret = %d\n",ret);
 free_ppa_list:
 	nvm_dev_dma_free(dev->parent, rqd.meta_list, rqd.dma_meta_list);
 	return ret;
@@ -1026,7 +1027,7 @@ void amf_submit_bio_write(struct f2fs_sb_info* sbi, struct bio* bio)
 	struct nvm_rq* rqd;
 	int ret;
 
-pr_notice("Enter amf_submit_bio_write(), lblkaddr = %d, nr_secs = %d\n", lblkaddr, nr_secs);
+//pr_notice("Enter amf_submit_bio_write(), lblkaddr = %d, nr_secs = %d\n", lblkaddr, nr_secs);
 retry:	
 	/*创建rqd*/
 	rqd = kzalloc(sizeof(struct nvm_rq),GFP_KERNEL);
@@ -1042,20 +1043,20 @@ retry:
 	if(nr_secs > 1){
 		for(i = 0; i < nr_secs; i++){
 		rqd->ppa_list[j++] = addr_ppa32_to_ppa64(sbi, lblkaddr+i);
-		pr_notice("lblkaddr = %d ==> rqd->ppa_list[j] = %d \n", lblkaddr+i, rqd->ppa_list[j-1]);
+		//pr_notice("lblkaddr = %d ==> rqd->ppa_list[j] = %d \n", lblkaddr+i, rqd->ppa_list[j-1]);
 		}
 	}else{
 		rqd->ppa_addr = addr_ppa32_to_ppa64(sbi, lblkaddr);
-		pr_notice("lblkaddr = %d ==> rqd->ppa_addr = %d \n", lblkaddr, rqd->ppa_addr);
+		//pr_notice("lblkaddr = %d ==> rqd->ppa_addr = %d \n", lblkaddr, rqd->ppa_addr);
 	}	
-	pr_notice("before nvm_submit_io()\n");
+	//pr_notice("before nvm_submit_io()\n");
 
 	ret = nvm_submit_io(dev, rqd);
 	if(ret){
 		pr_err("amf: amf_submit_bio_write failed:%d\n",ret);
 	}
 
-pr_notice("End amf_submit_bio_write(), ret = %d\n",ret);
+//pr_notice("End amf_submit_bio_write(), ret = %d\n",ret);
 	
 }
 
@@ -1068,7 +1069,7 @@ void amf_submit_bio_meta_w (struct f2fs_sb_info* sbi, struct bio* bio)
 		struct page* dst_page = NULL;
 		struct bio_vec bvec;
 		bool sync = op_is_sync(bio_op(bio));
-pr_notice("Enter amf_submit_bio_meta_w(), lblk = %d, nr_sec = %d\n", amf_get_lba(bio),amf_get_secs(bio));
+//pr_notice("Enter amf_submit_bio_meta_w(), lblk = %d, nr_sec = %d\n", amf_get_lba(bio),amf_get_secs(bio));
 		uint8_t* src_page_addr = NULL;
 		uint8_t* dst_page_addr = NULL;
 		struct bvec_iter bioloop;
@@ -1120,7 +1121,7 @@ pr_notice("Enter amf_submit_bio_meta_w(), lblk = %d, nr_sec = %d\n", amf_get_lba
 			dst_page_addr = (uint8_t*)page_address (dst_page);
 			memcpy (dst_page_addr, src_page_addr, PAGE_SIZE);
 
-			pr_notice("before submit_page_write(), lblkaddr = %d ==> pblkaddr = %d \n", lblkaddr, pblkaddr);
+//			pr_notice("before submit_page_write(), lblkaddr = %d ==> pblkaddr = %d \n", lblkaddr, pblkaddr);
 			//mdelay(6000);
 	
 			if (tgt_submit_page_write(sbi, dst_page, pblkaddr, 1) != 0) {
@@ -1129,7 +1130,7 @@ pr_notice("Enter amf_submit_bio_meta_w(), lblk = %d, nr_sec = %d\n", amf_get_lba
 				goto out;
 			}
 		}
-pr_notice("End amf_submit_bio_meta_w() ret = %d\n",ret);
+//pr_notice("End amf_submit_bio_meta_w() ret = %d\n",ret);
 		//mdelay(6000);
 	out:
 		if (ret == 0) {
@@ -1262,8 +1263,8 @@ void amf_submit_bio (struct f2fs_sb_info* sbi, struct bio * bio, enum page_type 
 	
 			start = bio->bi_iter.bi_size >> F2FS_BLKSIZE_BITS;
 			start %= F2FS_IO_SIZE(sbi);
-	pr_notice("bio->bi_iter.bi_size = %d\n", bio->bi_iter.bi_size);
-	pr_notice("start = %d\n", start);
+	//pr_notice("bio->bi_iter.bi_size = %d\n", bio->bi_iter.bi_size);
+	//pr_notice("start = %d\n", start);
 			if (start == 0)
 				goto submit_io;
 	

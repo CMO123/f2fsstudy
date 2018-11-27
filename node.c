@@ -1177,7 +1177,7 @@ repeat:
 	page = f2fs_grab_cache_page(NODE_MAPPING(sbi), nid, false);//找到nid所在的缓存page。难道将所有inode都缓存在cache中了？？？
 	if (!page)
 		return ERR_PTR(-ENOMEM);
-	pr_notice("__get_node_page() ,nid = %d\n", nid);//3
+//	pr_notice("__get_node_page() ,nid = %d\n", nid);//3
 	
 	err = read_node_page(page, 0);
 	if (err < 0) {
@@ -1224,7 +1224,7 @@ out_err:
 		f2fs_put_page(page, 1);
 		return ERR_PTR(err);
 	}
-	pr_notice("End __get_node_page()\n");
+	//pr_notice("End __get_node_page()\n");
 	return page;
 }
 
@@ -1586,7 +1586,7 @@ int sync_node_pages(struct f2fs_sb_info *sbi, struct writeback_control *wbc,
 	int ret = 0;
 	int nr_pages;
 	
-pr_notice("Enter sync_node_pages()\n");
+//pr_notice("Enter sync_node_pages()\n");
 	pagevec_init(&pvec);
 
 next_step:
@@ -1716,7 +1716,7 @@ static int f2fs_write_node_pages(struct address_space *mapping,
 	struct f2fs_sb_info *sbi = F2FS_M_SB(mapping);
 	struct blk_plug plug;
 	long diff;
-pr_notice("Enter f2fs_write_node_pages()==============wbc->nr_to_write = %lld,\n",wbc->nr_to_write);
+//pr_notice("Enter f2fs_write_node_pages()==============wbc->nr_to_write = %lld,\n",wbc->nr_to_write);
 	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING))){
 		pr_notice("error: sbi_flag_set()\n");
 		goto skip_write;
@@ -1742,7 +1742,7 @@ pr_notice("Enter f2fs_write_node_pages()==============wbc->nr_to_write = %lld,\n
 	sync_node_pages(sbi, wbc, true, FS_NODE_IO);
 	blk_finish_plug(&plug);
 	wbc->nr_to_write = max((long)0, wbc->nr_to_write - diff);
-pr_notice("End f2fs_write_node_pages()============\n");
+//pr_notice("End f2fs_write_node_pages()============\n");
 	return 0;
 
 skip_write:

@@ -489,7 +489,7 @@ int f2fs_submit_page_write(struct f2fs_io_info *fio)
 	struct f2fs_bio_info *io = sbi->write_io[btype] + fio->temp;
 	struct page *bio_page;
 	int err = 0;
-pr_notice("Enter f2fs_submit_page_write()===========\n");
+//pr_notice("Enter f2fs_submit_page_write()===========\n");
 	f2fs_bug_on(sbi, is_read_io(fio->op));
 
 
@@ -1466,7 +1466,7 @@ static int f2fs_mpage_readpages(struct address_space *mapping,
 	sector_t block_nr;
 	struct f2fs_map_blocks map;
 
-pr_notice("Enter f2fs_mpage_readpages()\n");
+//pr_notice("Enter f2fs_mpage_readpages()\n");
 
 	map.m_pblk = 0;
 	map.m_lblk = 0;
@@ -1743,7 +1743,7 @@ bool should_update_outplace(struct inode *inode, struct f2fs_io_info *fio)
 static inline bool need_inplace_update(struct f2fs_io_info *fio)
 {
 #ifdef AMF_NO_SSR
-pr_notice("need_inplace_update = false\n");
+//pr_notice("need_inplace_update = false\n");
 	return false;
 #else
 	struct inode *inode = fio->page->mapping->host;
@@ -1773,7 +1773,7 @@ int do_write_data_page(struct f2fs_io_info *fio)
 	bool ipu_force = false;
 	int err = 0;
 
-pr_notice("Enter do_write_data_page(), page->index = %d\n", page->index);
+//pr_notice("Enter do_write_data_page(), page->index = %d\n", page->index);
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
 	if (need_inplace_update(fio) &&
 			f2fs_lookup_extent_cache(inode, page->index, &ei)) {
@@ -1847,7 +1847,7 @@ out:
 	if (fio->need_lock == LOCK_REQ)
 		f2fs_unlock_op(fio->sbi);
 
-	pr_notice("End do_write_data_page()======err = %d\n",err);
+	//pr_notice("End do_write_data_page()======err = %d\n",err);
 	return err;
 }
 
@@ -1880,7 +1880,7 @@ static int __write_data_page(struct page *page, bool *submitted,
 		.io_wbc = wbc,
 	};
 
-	pr_notice("Enter __write_data_page()=========\n");
+	//pr_notice("Enter __write_data_page()=========\n");
 
 	trace_f2fs_writepage(page, DATA);
 
@@ -1983,7 +1983,7 @@ out:
 	if (submitted)
 		*submitted = fio.submitted;
 
-pr_notice("End __write_data_page()\n");
+//pr_notice("End __write_data_page()\n");
 	return 0;
 
 redirty_out:
@@ -1997,7 +1997,7 @@ redirty_out:
 static int f2fs_write_data_page(struct page *page,
 					struct writeback_control *wbc)
 {
-pr_notice("in f2fs_write_data_page()");
+//pr_notice("in f2fs_write_data_page()");
 	return __write_data_page(page, NULL, wbc, FS_DATA_IO);
 }
 

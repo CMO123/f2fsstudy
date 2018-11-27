@@ -211,7 +211,7 @@ static int f2fs_do_sync_file(struct file *file, loff_t start, loff_t end,
 		.nr_to_write = LONG_MAX,
 		.for_reclaim = 0,
 	};
-pr_notice("Enter f2fs_do_sync_file(), start = %d, end = %d, datasync = %d\n",start, end, datasync);//start = 0, end = -1, datasync = 0
+//pr_notice("Enter f2fs_do_sync_file(), start = %d, end = %d, datasync = %d\n",start, end, datasync);//start = 0, end = -1, datasync = 0
 	if (unlikely(f2fs_readonly(inode->i_sb)))
 		return 0;
 
@@ -220,10 +220,10 @@ pr_notice("Enter f2fs_do_sync_file(), start = %d, end = %d, datasync = %d\n",sta
 	/* if fdatasync is triggered, let's do in-place-update */
 	if (datasync || get_dirty_pages(inode) <= SM_I(sbi)->min_fsync_blocks)
 		set_inode_flag(inode, FI_NEED_IPU);
-	pr_notice("there?\n");//enter
+	//pr_notice("there?\n");//enter
 	ret = file_write_and_wait_range(file, start, end);
 	clear_inode_flag(inode, FI_NEED_IPU);
-	pr_notice("ret = %d\n",ret);//0
+	//pr_notice("ret = %d\n",ret);//0
 	if (ret) {
 		trace_f2fs_sync_file_exit(inode, cp_reason, datasync, ret);
 		return ret;
@@ -231,7 +231,7 @@ pr_notice("Enter f2fs_do_sync_file(), start = %d, end = %d, datasync = %d\n",sta
 
 	/* if the inode is dirty, let's recover all the time */
 	if (!f2fs_skip_inode_update(inode, datasync)) {
-		pr_notice("f2fs_skip_inode_update?\n");//enter
+		//pr_notice("f2fs_skip_inode_update?\n");//enter
 		f2fs_write_inode(inode, NULL);
 		goto go_write;//go_write
 	}
@@ -263,7 +263,7 @@ go_write:
 	up_read(&F2FS_I(inode)->i_sem);
 
 
-	pr_notice("cp_reason = %d\n",cp_reason);//9
+	//pr_notice("cp_reason = %d\n",cp_reason);//9
 	//mdelay(5000);
 
 	if (cp_reason) {
@@ -280,7 +280,7 @@ go_write:
 		goto out;
 	}
 sync_nodes:
-pr_notice("sync_node\n");
+//pr_notice("sync_node\n");
 	ret = fsync_node_pages(sbi, inode, &wbc, atomic);
 	if (ret)
 		goto out;
@@ -326,12 +326,13 @@ flush_out:
 out:
 	trace_f2fs_sync_file_exit(inode, cp_reason, datasync, ret);
 	f2fs_trace_ios(NULL, 1);
-	pr_notice("End f2fs_do_sync_file(), ret = %d\n", ret);
+	//pr_notice("End f2fs_do_sync_file(), ret = %d\n", ret);
 	return ret;
 }
 
 int f2fs_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
-{pr_notice("Enter f2fs_sync_file()\n");
+{
+//pr_notice("Enter f2fs_sync_file()\n");
 	if (unlikely(f2fs_cp_error(F2FS_I_SB(file_inode(file)))))
 		return -EIO;
 	return f2fs_do_sync_file(file, start, end, datasync, false);

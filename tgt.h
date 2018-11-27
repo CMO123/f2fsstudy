@@ -163,7 +163,7 @@ static void* lightpblk_init(struct nvm_tgt_dev *dev, struct gendisk **ptdisk, st
 	struct lightpblk *alightpblk;
 	struct nvm_geo* geo;
 
-pr_notice("Enter lightpblk_init()\n");
+//pr_notice("Enter lightpblk_init()\n");
 
 	alightpblk= kzalloc(sizeof(struct lightpblk), GFP_KERNEL);
 	if (!alightpblk)
@@ -187,7 +187,7 @@ static void lightpblk_exit(void *private)
 	struct lightpblk* alightpblk = private;
 	kfree(alightpblk);
 	light_pblk = NULL;	
-pr_notice("Exit lightpblk_exit()\n");
+//pr_notice("Exit lightpblk_exit()\n");
 
 }
 
@@ -230,10 +230,11 @@ static struct lightpblk* lightpblk_fs_create(struct super_block* sb, char* name)
 	create.tgttype[NVM_TTYPE_NAME_MAX - 1] = '\0';
 	create.tgtname[DISK_NAME_LEN - 1] = '\0';
 
+/*
 	pr_notice("create.dev = %s\n", create.dev);
 	pr_notice("create.tgttype = %s\n", create.tgttype);
 	pr_notice("create.tgtname = %s\n", create.tgtname);
-
+*/
 
 	err = __nvm_configure_create(&create);
 	if(err)
@@ -411,15 +412,15 @@ static void tgt_end_io_write(struct nvm_rq* rqd)
 	nvm_dev_dma_free(rqd->dev->parent, rqd->meta_list, rqd->dma_meta_list);
 	kfree(rqd);
 	
-	pr_notice("tgt_end_io_write()\n");
+	//pr_notice("tgt_end_io_write()\n");
 }
 static void tgt_end_io_erase(struct nvm_rq* rqd)
 {
 	//return NULL;
 	
 	
-	pr_notice("=====================Enter tgt_end_io_erase()\n");
-	pr_notice("rqd->ppa_addr.ppa = 0x%llx\n", rqd->ppa_addr.ppa);
+	//pr_notice("=====================Enter tgt_end_io_erase()\n");
+	//pr_notice("rqd->ppa_addr.ppa = 0x%llx\n", rqd->ppa_addr.ppa);
 	kfree(rqd);
 }
 
@@ -630,7 +631,7 @@ static int tgt_submit_page_erase_async(struct f2fs_sb_info *sbi, struct ppa_addr
 		rqd->end_io = tgt_end_io_erase;
 		rqd->private = rqd;//传入end_io
 		
-		pr_notice("tgt_submit_erase(): ppa = 0x%llx\n", paddr.ppa);
+		//pr_notice("tgt_submit_erase(): ppa = 0x%llx\n", paddr.ppa);
 	
 		if(tgt_boundary_ppa_checks(dev, &paddr, 1)){
 			pr_notice("tgt: tgt_boundary_ppa_checks_error()\n");
@@ -657,7 +658,7 @@ static int tgt_submit_page_erase_sync(struct f2fs_sb_info *sbi, struct ppa_addr 
 		pr_notice("tgt: tgt_boundary_ppa_checks_error()\n");
 	}
 	
-	pr_notice("tgt_submit_erase(): ppa = 0x%llx\n", paddr.ppa);
+	//pr_notice("tgt_submit_erase(): ppa = 0x%llx\n", paddr.ppa);
 		
 	ret = nvm_submit_io_sync(dev, &rqd);
 	if(ret){
